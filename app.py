@@ -87,7 +87,7 @@ with st.sidebar:
 
 # Information about pages
 st.subheader("Pages")
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("### 📤 Data Upload")
@@ -110,6 +110,18 @@ with col2:
     - Export results for further analysis
     
     [Go to Analytics & Charts](/Analytics_Charts)
+    """)
+
+with col3:
+    st.markdown("### 🔍 Category Analysis")
+    st.markdown("""
+    The Category Analysis page focuses on the categories and aspects from your internal API:
+    - What aspects are in each category?
+    - Which aspects are most/least used?
+    - Which categories have no aspects?
+    - Visualize aspect distribution across categories
+    
+    [Go to Category Analysis](/Category_Analysis)
     """)
 
 # Footer

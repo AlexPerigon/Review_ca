@@ -161,11 +161,25 @@ with tabs[1]:
                 # Convert to DataFrame for easier handling
                 categories_df = pd.DataFrame(categories)
                 
-                # Display the categories in a dataframe
+                # Save the data to file for later use (cached)
                 if not categories_df.empty:
+                    # Create directory if it doesn't exist
+                    os.makedirs("example_data", exist_ok=True)
+                    
+                    # Save to file
+                    categories_df.to_csv("example_data/review_categories.csv", index=False)
+                    st.success("✅ Saved categories data to file for analytics")
+                    
                     # Show a preview of the data
                     st.subheader("Category Data Preview")
                     st.dataframe(categories_df)
+                    
+                    # Add direct link to analytics
+                    st.info("The data is now available for analysis.")
+                    st.markdown("[Go to Category Analysis](/Category_Analysis)")
+                    
+                    # Store in session state for immediate use
+                    st.session_state['category_data'] = categories_df
                     
                     # Option to save as CSV
                     csv_data = categories_df.to_csv(index=False)

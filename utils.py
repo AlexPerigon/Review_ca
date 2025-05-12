@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import io
 import base64
+import json
+import ast
 import streamlit as st
 from internal_api import InternalAPIClient
 
@@ -173,3 +175,79 @@ def get_aspect_distribution(analysis_df):
     category_aspect_counts.columns = ['category', 'unique_aspects']
     
     return category_aspect_counts
+
+# Load the category data from file
+def load_category_data(file_path="example_data/review_categories.csv"):
+    """Load and process category data from CSV file"""
+    try:
+        df = pd.read_csv(file_path)
+        
+        # Process the 'aspects' column which contains stringified lists
+        df['aspects_parsed'] = df['aspects'].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) and x.strip() else []
+        )
+        
+        return df
+    except Exception as e:
+        st.error(f"Error loading category data: {str(e)}")
+        return None
+
+# Analyze aspects across categories
+def analyze_category_aspects(df):
+    """Analyze the distribution of aspects across categories"""
+    if df is None:
+        return None
+    
+    # Count categories with no aspects
+    categories_no_aspects = df[df['aspectsCount'] == 0]
+    
+    # Get all unique aspects across all categories
+    all_aspects = set()
+    aspect_counts = {}
+    
+    for aspects_list in df['aspects_parsed']:
+        for aspect in aspects_list:
+            all_aspects.add(aspect)
+            aspect_counts[aspect] = aspect_counts.get(aspect, 0) + 1
+    
+    # Create a DataFrame with aspect frequencies
+    aspect_freq = pd.DataFrame({
+        'aspect': list(aspect_counts.keys()),
+        'count': list(aspect_counts.values())
+    }).sort_values('count', ascending=False)
+    
+    return {
+        'all_aspects': all_aspects,
+        'aspect_counts': aspect_counts,
+        'aspect_freq': aspect_freq,
+        'categories_no_aspects': categories_no_aspects
+    }
+
+# Create a matrix of aspects by category
+def create_aspect_category_matrix(df):
+    """Create a matrix showing which aspects are used in which categories"""
+    if df is None:
+        return None
+    
+    # Get all unique aspects
+    all_aspects = set()
+    for aspects_list in df['aspects_parsed']:
+        all_aspects.update(aspects_list)
+    
+    # Create a dictionary of category -> aspects
+    category_aspects = {}
+    for _, row in df.iterrows():
+        if row['aspects_parsed']:
+            category_aspects[row['name']] = set(row['aspects_parsed'])
+        else:
+            category_aspects[row['name']] = set()
+    
+    # Create a matrix (aspects as rows, categories as columns)
+    matrix_data = []
+    for aspect in sorted(all_aspects):
+        row = {'aspect': aspect}
+        for category, aspects in category_aspects.items():
+            row[category] = 1 if aspect in aspects else 0
+        matrix_data.append(row)
+    
+    return pd.DataFrame(matrix_data)
