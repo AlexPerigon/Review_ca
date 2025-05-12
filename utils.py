@@ -5,6 +5,7 @@ import io
 import base64
 import json
 import ast
+import datetime
 import streamlit as st
 from internal_api import InternalAPIClient
 
@@ -27,10 +28,56 @@ def generate_example_csv():
 # Function to download dataframe as CSV
 def get_csv_download_link(df, filename="analysis_export.csv"):
     """Generates a link to download the dataframe as a CSV file"""
+    if df is None or df.empty:
+        return "No data to download"
+        
     csv = df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">Download CSV file</a>'
     return href
+    
+def get_json_download_link(data, filename="analysis_export.json"):
+    """Generates a link to download data as a JSON file
+    
+    Parameters:
+    -----------
+    data : dict, list, DataFrame
+        The data to convert to JSON and download
+    filename : str
+        The name of the downloaded file
+        
+    Returns:
+    --------
+    str
+        HTML link for downloading the JSON data
+    """
+    if data is None:
+        return "No data to download"
+        
+    try:
+        if isinstance(data, pd.DataFrame):
+            # Convert DataFrame to dictionary
+            # Handle datetime conversion
+            json_str = data.to_json(orient='records', date_format='iso')
+        else:
+            # Convert dict or list to JSON with date handling
+            def json_serial(obj):
+                """JSON serializer for objects not serializable by default json code"""
+                if isinstance(obj, (datetime.datetime, datetime.date)):
+                    return obj.isoformat()
+                raise TypeError(f"Type {type(obj)} not serializable")
+                
+            json_str = json.dumps(data, default=json_serial)
+            
+        # Base64 encode the JSON string
+        b64 = base64.b64encode(json_str.encode()).decode()
+        
+        # Create download link
+        href = f'<a href="data:file/json;base64,{b64}" download="{filename}">Download JSON file</a>'
+        
+        return href
+    except Exception as e:
+        return f"Error generating JSON download link: {str(e)}"
 
 # Function to process a CSV file
 def process_csv(uploaded_file):

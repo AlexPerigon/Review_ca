@@ -11,7 +11,8 @@ from utils import (
     load_category_data,
     analyze_category_aspects,
     create_aspect_category_matrix,
-    get_csv_download_link
+    get_csv_download_link,
+    get_json_download_link
 )
 
 # Page configuration
@@ -72,8 +73,12 @@ with tabs[0]:
     # Sort categories by aspect count
     sorted_categories = category_data.sort_values('aspectsCount', ascending=False)
     
-    # Create a bar chart of aspect counts by category
-    fig, ax = plt.subplots(figsize=(12, 10))
+    # Create a bar chart of aspect counts by category with dynamic sizing
+    # Calculate the figure height based on number of categories (minimum 10, with 0.4 units per category)
+    num_categories = len(sorted_categories[sorted_categories['aspectsCount'] > 0])
+    figure_height = max(10, num_categories * 0.4)  # Dynamic height with minimum of 10
+    
+    fig, ax = plt.subplots(figsize=(12, figure_height))
     
     # Only include categories with aspects
     categories_with_data = sorted_categories[sorted_categories['aspectsCount'] > 0]
@@ -84,7 +89,7 @@ with tabs[0]:
     # Add labels and formatting
     ax.set_xlabel('Number of Aspects')
     ax.set_ylabel('Category')
-    ax.set_title('Number of Aspects by Category')
+    ax.set_title('Number of Aspects by Category', fontsize=16)
     ax.grid(axis='x', linestyle='--', alpha=0.7)
     
     # Add the values at the end of each bar
@@ -93,6 +98,10 @@ with tabs[0]:
         label_x_pos = width + 0.3
         ax.text(label_x_pos, bar.get_y() + bar.get_height()/2, f'{width:.0f}', 
                 ha='left', va='center')
+                
+    # Adjust layout and margins
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.25)  # Add more space for category names
     
     st.pyplot(fig)
     
