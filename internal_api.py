@@ -117,8 +117,10 @@ class InternalAPIClient:
         all_results = []
         page = 0
         size = 20  # Reasonable page size
+        more_pages = True  # Flag to indicate if more pages are available
         
-        while page < max_pages:
+        while page < max_pages and more_pages:
+            # Request the current page of results
             response = self.get_review_categories(
                 page=page, 
                 size=size, 
@@ -126,30 +128,44 @@ class InternalAPIClient:
                 sort_order=sort_order
             )
             
+            # Check for error responses
             if isinstance(response, dict) and "error" in response:
                 return response
             
-            # Check if we got valid content (API response structure)
-            if not isinstance(response, dict) or "content" not in response:
+            # Check if we got valid data (TableSearchResult structure)
+            if not isinstance(response, dict) or "data" not in response:
                 return {
                     "error": "Unexpected API response format",
-                    "details": "The 'content' field is missing from the response"
+                    "details": "The 'data' field is missing from the response (expected TableSearchResult structure)"
                 }
                 
-            # Add results to our collection
-            content = response.get("content", [])
-            if content:
-                all_results.extend(content)
+            # Extract data from the response
+            data = response.get("data", [])
             
-            # Check if this is the last page
+            # If no data or empty data array, we're done
+            if not data:
+                more_pages = False
+                break
+                
+            # Add the data to our results
+            all_results.extend(data)
+            
+            # Check if we have more pages
             try:
-                total_pages = int(response.get("totalPages", 0))
-                if page >= total_pages - 1:
+                # Get total count (safely convert to int)
+                total_count = int(response.get("total", 0))
+                
+                # Calculate if we're on the last page
+                items_so_far = (page + 1) * size
+                if items_so_far >= total_count:
+                    more_pages = False
                     break
             except (ValueError, TypeError):
-                # If totalPages is not convertible to int, just continue to next page
-                pass
+                # If there's an error converting total, assume this is the last page
+                more_pages = False
+                break
                 
+            # Move to the next page
             page += 1
             
         # Process the results to ensure all expected fields are present

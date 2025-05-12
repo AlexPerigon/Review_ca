@@ -60,14 +60,27 @@ with st.sidebar:
         - sortBy (default: "id") - Field to sort by
         - sortOrder (default: "asc") - Sort order
         
-        **Response Fields**:
-        - id - Category ID
-        - name - Category name
-        - createdAt - Creation timestamp
-        - updatedAt - Last update timestamp
-        - caCategoryId - Category ID in CA system
-        - rulesPath - Path to rules (if any)
-        - aspects - List of aspects for this category
+        **Response Structure**:
+        ```json
+        {
+          "total": 123,  // Total number of records
+          "data": [      // Array of CAReviewCategoryDto objects
+            {
+              "id": 1,
+              "name": "Category Name",
+              "createdAt": "2023-01-01T12:00:00Z",
+              "updatedAt": "2023-01-02T12:00:00Z",
+              "caCategoryId": "cat123",
+              "rulesPath": "/path/to/rules",
+              "aspects": [
+                {"name": "Aspect 1"},
+                {"name": "Aspect 2"}
+              ]
+            },
+            // more categories...
+          ]
+        }
+        ```
         """)
     
     # API fetch options
