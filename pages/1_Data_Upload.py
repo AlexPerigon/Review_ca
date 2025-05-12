@@ -1,20 +1,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import io
-import base64
 import os
-import glob
+import io
 import json
-import requests
-from internal_api import InternalAPIClient
-from utils import (
-    generate_example_csv, 
-    get_csv_download_link, 
-    process_csv, 
-    fetch_internal_api_data,
-    get_api_uploaded_files
-)
+import base64
+import ast
+from utils import fetch_internal_api_data, get_csv_download_link, get_json_download_link
 
 # Page configuration
 st.set_page_config(
@@ -24,402 +16,424 @@ st.set_page_config(
 )
 
 # App title and description
-st.title("Data Upload Options")
+st.title("Data Upload")
 st.markdown("""
-This page provides multiple ways to import your review data for analysis.
+Upload your review data to start the analysis. You can upload a CSV file directly,
+import from our internal API, or send data programmatically via our API.
 """)
 
 # Create tabs for different upload methods
-tabs = st.tabs([
-    "Upload CSV", 
-    "Import from API", 
-    "API Uploads", 
-    "Test API Integration"
-])
+tabs = st.tabs(["CSV Upload", "Import from API", "API Integration"])
 
 # Tab 1: CSV Upload
 with tabs[0]:
     st.header("Upload CSV File")
+    
+    # Instructions
     st.markdown("""
-    Upload a CSV file containing review data with the required columns:
-    - review_id: Unique identifier for each review
-    - review_text: The text content of the review
-    - category: The category assigned to the review
-    - aspects: Comma-separated list of aspects found in the review
+    ### CSV Format Requirements
+    Your CSV file should include the following columns:
+    - `review_id`: Unique identifier for each review
+    - `review_text`: The full text of the review
+    - `category`: Product/service category the review belongs to
+    - `aspects`: Comma-separated list of aspects mentioned in the review
+    
+    Example row: `101,Great product with excellent battery life,Electronics,battery,price,design`
     """)
     
-    # Example data download option
-    with st.expander("Need sample data?"):
-        st.markdown("Download example data to see the expected format:")
+    # Use example data option
+    if st.checkbox("Use example data instead"):
+        st.markdown("Using example data with pre-defined reviews and aspects.")
+        from utils import generate_example_csv
         example_data = generate_example_csv()
-        example_data.seek(0)
+        
+        # Create a download link for the example data
         st.download_button(
             label="Download Example CSV",
             data=example_data.getvalue(),
             file_name="example_reviews.csv",
             mime="text/csv"
         )
-    
-    # File uploader
-    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
-    
-    if uploaded_file is not None:
-        # Process the uploaded file
-        df = process_csv(uploaded_file)
         
-        if df is not None:
-            st.success(f"Successfully loaded {len(df)} reviews!")
+        # Process the example data
+        example_data.seek(0)  # Reset position to start of stream
+        df = pd.read_csv(example_data)
+        
+        st.success("✅ Example data loaded successfully!")
+        
+        # Display data
+        st.subheader("Data Preview")
+        st.dataframe(df.head())
+        
+        # Process aspects
+        if 'aspects' in df.columns:
+            df['aspects_list'] = df['aspects'].str.split(',')
+        
+        # Option to save to session state for analysis
+        if st.button("Use Example Data for Analysis"):
+            st.session_state['uploaded_data'] = df
+            st.success("✅ Example data saved for analysis!")
             
-            # Display raw data sample with expander
-            with st.expander("View Raw Data Sample"):
-                st.dataframe(df.head(10))
+            # Set redirection in session state
+            if 'redirect_to' not in st.session_state:
+                st.session_state['redirect_to'] = '/Analytics_Charts'
             
-            # Option to save to session state for analysis
-            if st.button("Use This Data for Analysis"):
-                st.session_state['uploaded_data'] = df
-                st.success("Data saved for analysis! Go to the Analytics & Charts page to view insights.")
-                st.markdown("[Go to Analytics & Charts](/Analytics_Charts)")
-
-# Tab 2: Import from API
-with tabs[1]:
-    st.header("Import from Internal API")
+            # Auto-navigation
+            st.info("You will be automatically redirected to the Analytics page.")
+            st.markdown("<meta http-equiv='refresh' content='2; url=/Analytics_Charts'>", unsafe_allow_html=True)
+            st.markdown("[Click here if not redirected](/Analytics_Charts)")
     
-    # Expand section about the API
-    with st.expander("About the Internal API Integration"):
-        st.markdown("""
-        ### Internal API Integration
+    else:
+        # File uploader
+        uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
         
-        This app can connect to your internal API endpoint at:
-        ```
-        https://api.perigon.io/v1/internal/ca/reviewCategory/
-        ```
-        
-        **Authentication**:
-        - Uses the SHARED_SECRET as a query parameter
-        
-        **Pagination Parameters**:
-        - page (default: 0) - The page number to retrieve
-        - size (default: 20) - Number of items per page
-        - sortBy (default: "id") - Field to sort by
-        - sortOrder (default: "asc") - Sort order
-        
-        **Response Structure**:
-        ```json
-        {
-          "total": 123,  // Total number of records
-          "data": [      // Array of CAReviewCategoryDto objects
-            {
-              "id": 1,
-              "name": "Category Name",
-              "createdAt": "2023-01-01T12:00:00Z",
-              "updatedAt": "2023-01-02T12:00:00Z",
-              "caCategoryId": "cat123",
-              "rulesPath": "/path/to/rules",
-              "aspects": [
-                {"name": "Aspect 1"},
-                {"name": "Aspect 2"}
-              ]
-            },
-            // more categories...
-          ]
-        }
-        ```
-        """)
-    
-    # API fetch options
-    col1, col2 = st.columns(2)
-    with col1:
-        sort_by = st.selectbox(
-            "Sort by field", 
-            options=["id", "name", "createdAt", "updatedAt"],
-            index=0
-        )
-    with col2:
-        sort_order = st.selectbox(
-            "Sort order", 
-            options=["asc", "desc"],
-            index=0
-        )
-    
-    # Button to fetch data
-    if st.button("Fetch Categories from Internal API"):
-        with st.spinner("Fetching data from internal API..."):
-            # Fetch categories from the API
-            categories = fetch_internal_api_data(
-                sort_by=sort_by,
-                sort_order=sort_order
-            )
+        if uploaded_file is not None:
+            # Process the uploaded file
+            from utils import process_csv
+            df = process_csv(uploaded_file)
             
-            if isinstance(categories, dict) and "error" in categories:
-                st.error(f"Error fetching categories: {categories['error']}")
-                if "details" in categories:
-                    st.error(f"Details: {categories['details']}")
+            if df is None:
+                st.error("Failed to process the uploaded file. Please ensure it follows the required format.")
             else:
-                # Successfully fetched categories
-                st.success(f"Successfully fetched {len(categories)} categories from the API")
+                st.success("✅ File uploaded and processed successfully!")
                 
-                # Convert to DataFrame for easier handling
-                categories_df = pd.DataFrame(categories)
-                
-                # Save the data to file for later use (cached)
-                if not categories_df.empty:
-                    # Create directory if it doesn't exist
-                    os.makedirs("example_data", exist_ok=True)
-                    
-                    # Save to file
-                    categories_df.to_csv("example_data/review_categories.csv", index=False)
-                    st.success("✅ Saved categories data to file for analytics")
-                    
-                    # Show a preview of the data
-                    st.subheader("Category Data Preview")
-                    st.dataframe(categories_df)
-                    
-                    # Add direct link to analytics
-                    st.info("The data is now available for analysis.")
-                    st.markdown("[Go to Category Analysis](/Category_Analysis)")
-                    
-                    # Store in session state for immediate use
-                    st.session_state['category_data'] = categories_df
-                    
-                    # Option to save as CSV
-                    csv_data = categories_df.to_csv(index=False)
-                    csv_b64 = base64.b64encode(csv_data.encode()).decode()
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown(
-                            f'<a href="data:file/csv;base64,{csv_b64}" download="review_categories.csv">Download Categories as CSV</a>', 
-                            unsafe_allow_html=True
-                        )
-                    
-                    with col2:
-                        # Option to create a review analysis template
-                        if st.button("Create Analysis Template from Categories"):
-                            # Create a template CSV with review_id, review_text, category, and aspects columns
-                            # using the fetched category names
-                            if 'name' in categories_df.columns:
-                                categories_list = categories_df['name'].tolist()
-                                
-                                # Create template data
-                                template_data = []
-                                for i, category in enumerate(categories_list[:5]):  # Limit to 5 examples
-                                    template_data.append({
-                                        'review_id': i+1,
-                                        'review_text': f"Example review for {category}",
-                                        'category': category,
-                                        'aspects': "aspect1,aspect2"
-                                    })
-                                
-                                template_df = pd.DataFrame(template_data)
-                                
-                                # Save template as CSV
-                                template_csv = template_df.to_csv(index=False)
-                                template_b64 = base64.b64encode(template_csv.encode()).decode()
-                                
-                                st.success("Created analysis template based on your categories!")
-                                st.markdown(
-                                    f'<a href="data:file/csv;base64,{template_b64}" download="review_analysis_template.csv">Download Analysis Template</a>', 
-                                    unsafe_allow_html=True
-                                )
-
-# Tab 3: API Uploads
-with tabs[2]:
-    st.header("API Uploads")
-    st.markdown("""
-    Files uploaded through the API endpoint will appear here. You can select a file to use for analysis.
-    """)
-    
-    # Check for files in the uploads directory (from API)
-    api_uploaded_files = get_api_uploaded_files()
-    
-    if api_uploaded_files:
-        st.success(f"Found {len(api_uploaded_files)} files uploaded via API")
-        
-        selected_api_file = st.selectbox(
-            "Select an API-uploaded file to analyze:",
-            options=api_uploaded_files,
-            format_func=lambda x: os.path.basename(x)
-        )
-        
-        if selected_api_file:
-            st.info(f"Selected file: {os.path.basename(selected_api_file)}")
-            
-            # Process the selected file
-            df = process_csv(selected_api_file)
-            
-            if df is not None:
-                st.success(f"Successfully loaded {len(df)} reviews from the API-uploaded file!")
+                # Display data preview
+                st.subheader("Data Preview")
+                st.dataframe(df.head())
                 
                 # Display raw data sample with expander
                 with st.expander("View Raw Data Sample"):
                     st.dataframe(df.head(10))
                 
                 # Option to save to session state for analysis
-                if st.button("Use This API Data for Analysis"):
+                if st.button("Use This Data for Analysis"):
                     st.session_state['uploaded_data'] = df
-                    st.success("API data saved for analysis! Go to the Analytics & Charts page to view insights.")
-                    st.markdown("[Go to Analytics & Charts](/Analytics_Charts)")
-    else:
-        st.warning("No files have been uploaded via the API yet.")
-        
-        # Display API usage information
-        with st.expander("API Usage Information"):
-            st.markdown("""
-            ## API Endpoint
-            
-            You can upload files programmatically via the API endpoint:
-            
-            ```
-            POST /api/upload
-            ```
-            
-            ### Headers
-            - `X-API-Key`: Your API key (set in the environment variables)
-            
-            ### Request
-            - Send the CSV file as a multipart/form-data with key 'file'
-            
-            ### Example (curl)
-            ```bash
-            curl -X POST \\
-                -H "X-API-Key: your_api_key" \\
-                -F "file=@your_reviews.csv" \\
-                http://your-app-url/api/upload
-            ```
-            
-            Uploaded files will appear in this tab for analysis.
-            """)
+                    st.success("✅ Data saved for analysis!")
+                    
+                    # Set redirection in session state
+                    if 'redirect_to' not in st.session_state:
+                        st.session_state['redirect_to'] = '/Analytics_Charts'
+                    
+                    # Auto-navigation button
+                    st.info("You will be automatically redirected to the Analytics page.")
+                    st.markdown("<meta http-equiv='refresh' content='2; url=/Analytics_Charts'>", unsafe_allow_html=True)
+                    st.markdown("[Click here if not redirected](/Analytics_Charts)")
 
-# Tab 4: Test API Integration
-with tabs[3]:
-    st.header("Test API Integration")
-    st.markdown("""
-    This tab allows you to test the API integration by making direct requests to the API endpoints.
-    """)
+# Tab 2: Import from API
+with tabs[1]:
+    st.header("Import from APIs")
     
-    # Test API options
-    api_test_option = st.radio(
-        "Select an API to test",
-        options=[
-            "Internal API (GET /ca/reviewCategory/)",
-            "Upload API (POST /api/upload)"
+    # API selection dropdown
+    api_selection = st.selectbox(
+        "Select API Source",
+        [
+            "Review Categories API (Perigon)", 
+            "Custom Categories API (Upload)",
+            "Review Data API (Coming Soon)"
         ]
     )
     
-    if api_test_option == "Internal API (GET /ca/reviewCategory/)":
-        st.subheader("Test Internal API Connection")
+    # Show different content based on API selection
+    if api_selection == "Review Categories API (Perigon)":
+        # Expand section about the API
+        with st.expander("About the Perigon Categories API"):
+            st.markdown("""
+            ### Perigon Review Categories API
+            
+            This app can connect to your internal API endpoint at:
+            ```
+            https://api.perigon.io/v1/internal/ca/reviewCategory/
+            ```
+            
+            **Authentication**:
+            - Uses the SHARED_SECRET as a query parameter
+            
+            **Pagination Parameters**:
+            - page (default: 0) - The page number to retrieve
+            - size (default: 20) - Number of items per page
+            - sortBy (default: "id") - Field to sort by
+            - sortOrder (default: "asc") - Sort order
+            
+            **Response Structure**:
+            ```json
+            {
+              "total": 123,  // Total number of records
+              "data": [      // Array of CAReviewCategoryDto objects
+                {
+                  "id": 1,
+                  "name": "Category Name",
+                  "createdAt": "2023-01-01T12:00:00Z",
+                  "updatedAt": "2023-01-02T12:00:00Z",
+                  "caCategoryId": "cat123",
+                  "rulesPath": "/path/to/rules",
+                  "aspects": [
+                    {"name": "Aspect 1"},
+                    {"name": "Aspect 2"}
+                  ]
+                },
+                // more categories...
+              ]
+            }
+            ```
+            """)
         
-        # Parameters for the internal API
-        with st.form("internal_api_test_form"):
-            # Form for testing internal API
-            st.markdown("#### Request Parameters")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                test_sort_by = st.selectbox(
-                    "sortBy", 
-                    options=["id", "name", "createdAt", "updatedAt"],
-                    index=0
+        # API fetch options
+        col1, col2 = st.columns(2)
+        with col1:
+            sort_by = st.selectbox(
+                "Sort by field", 
+                options=["id", "name", "createdAt", "updatedAt"],
+                index=0
+            )
+        with col2:
+            sort_order = st.selectbox(
+                "Sort order", 
+                options=["asc", "desc"],
+                index=0
+            )
+        
+        # Button to fetch data
+        if st.button("Fetch Categories from Perigon API"):
+            with st.spinner("Fetching data from Perigon API..."):
+                # Fetch categories from the API
+                categories = fetch_internal_api_data(
+                    sort_by=sort_by,
+                    sort_order=sort_order
                 )
-            with col2:
-                test_sort_order = st.selectbox(
-                    "sortOrder", 
-                    options=["asc", "desc"],
-                    index=0
-                )
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                test_page = st.number_input("page", min_value=0, value=0)
-            with col2:
-                test_size = st.number_input("size", min_value=1, max_value=100, value=10)
-            
-            submit_button = st.form_submit_button("Send Test Request")
-            
-            if submit_button:
-                with st.spinner("Sending request to internal API..."):
-                    # Construct the request
-                    api_client = InternalAPIClient()
-                    response = api_client.get_review_categories(
-                        page=test_page,
-                        size=test_size,
-                        sort_by=test_sort_by,
-                        sort_order=test_sort_order
-                    )
+                
+                if isinstance(categories, dict) and "error" in categories:
+                    st.error(f"Error fetching categories: {categories['error']}")
+                    if "details" in categories:
+                        st.error(f"Details: {categories['details']}")
+                else:
+                    # Successfully fetched categories
+                    st.success(f"Successfully fetched {len(categories)} categories from the API")
                     
-                    # Display the results
-                    st.subheader("API Response")
-                    if isinstance(response, dict) and "error" in response:
-                        st.error(f"Error from API: {response['error']}")
-                        if "details" in response:
-                            st.error(f"Details: {response['details']}")
-                    else:
-                        st.success("Successfully received response from the API")
+                    # Convert to DataFrame for easier handling
+                    categories_df = pd.DataFrame(categories)
+                    
+                    # Save the data to file for later use (cached)
+                    if not categories_df.empty:
+                        # Create directory if it doesn't exist
+                        os.makedirs("example_data", exist_ok=True)
                         
-                        # Show the raw response
-                        with st.expander("View Raw API Response"):
-                            st.json(response)
+                        # Save to file
+                        categories_df.to_csv("example_data/review_categories.csv", index=False)
+                        st.success("✅ Saved categories data to file for analytics")
                         
-                        # Show data count if available
-                        if "total" in response:
-                            st.metric("Total Records", response["total"])
+                        # Show a preview of the data
+                        st.subheader("Category Data Preview")
+                        st.dataframe(categories_df)
                         
-                        # Show data if available
-                        if "data" in response and response["data"]:
-                            st.subheader("Data Preview")
-                            st.dataframe(pd.DataFrame(response["data"]).head(10))
+                        # Store in session state for immediate use
+                        st.session_state['category_data'] = categories_df
+                        
+                        # Set redirection in session state
+                        if 'redirect_to' not in st.session_state:
+                            st.session_state['redirect_to'] = '/Category_Analysis'
+                        
+                        # Auto-navigation
+                        st.info("You will be automatically redirected to the Category Analysis page.")
+                        st.markdown("<meta http-equiv='refresh' content='2; url=/Category_Analysis'>", unsafe_allow_html=True)
+                        st.markdown("[Click here if not redirected](/Category_Analysis)")
     
-    else:  # Upload API test
-        st.subheader("Test Upload API")
+    elif api_selection == "Custom Categories API (Upload)":
+        st.subheader("Upload Categories CSV/JSON File")
         st.markdown("""
-        This form allows you to test uploading a file via the API endpoint without using curl or external tools.
+        Upload your own category data in CSV or JSON format. The file should have the following columns:
+        - id: Unique identifier for the category
+        - name: Category name
+        - aspectsCount: Number of aspects in the category
+        - aspects: List of aspects (as a string representation of an array)
         """)
         
-        # Form for testing upload API
-        with st.form("upload_api_test_form"):
-            st.markdown("#### Upload Test File")
-            
-            # File upload field
-            test_file = st.file_uploader("Select a CSV file to upload", type=["csv"])
-            
-            # API key field
-            api_key = st.text_input("API Key", value=os.environ.get("API_KEY", ""))
-            
-            submit_button = st.form_submit_button("Send Upload Request")
-            
-            if submit_button:
-                if not test_file:
-                    st.error("Please select a file to upload")
-                elif not api_key:
-                    st.error("Please enter an API key")
+        # File uploader
+        uploaded_file = st.file_uploader("Choose a CSV or JSON file", type=["csv", "json"])
+        
+        if uploaded_file is not None:
+            try:
+                # Check file type and process accordingly
+                if uploaded_file.name.endswith('.csv'):
+                    df = pd.read_csv(uploaded_file)
+                    file_type = "CSV"
                 else:
-                    with st.spinner("Sending upload request..."):
-                        try:
-                            # Construct the upload request
-                            url = "http://localhost:5001/api/upload"
-                            headers = {"X-API-Key": api_key}
-                            files = {"file": test_file}
-                            
-                            # Send the request
-                            response = requests.post(url, headers=headers, files=files)
-                            
-                            # Display the result
-                            st.subheader("API Response")
-                            
-                            try:
-                                response_json = response.json()
-                                st.json(response_json)
-                                
-                                if response.status_code == 200:
-                                    st.success(f"File successfully uploaded with status code: {response.status_code}")
-                                    if "row_count" in response_json:
-                                        st.metric("Rows Processed", response_json["row_count"])
-                                else:
-                                    st.error(f"Upload failed with status code: {response.status_code}")
-                            except:
-                                st.error(f"Could not parse JSON response. Status code: {response.status_code}")
-                                st.text(response.text)
-                        
-                        except Exception as e:
-                            st.error(f"Error sending request: {str(e)}")
-                            st.info("Make sure the API server is running on port 5001")
+                    df = pd.read_json(uploaded_file)
+                    file_type = "JSON"
+                
+                # Display success message
+                st.success(f"✅ Successfully loaded {file_type} file: {uploaded_file.name}")
+                
+                # Process aspects column if it exists
+                if 'aspects' in df.columns:
+                    try:
+                        df['aspects_parsed'] = df['aspects'].apply(
+                            lambda x: json.loads(x) if isinstance(x, str) and x.strip() else []
+                        )
+                    except:
+                        # Try with ast literal eval as fallback
+                        import ast
+                        df['aspects_parsed'] = df['aspects'].apply(
+                            lambda x: ast.literal_eval(x) if isinstance(x, str) and x.strip() else []
+                        )
+                
+                # Save to file
+                os.makedirs("example_data", exist_ok=True)
+                filename = f"custom_categories_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                df.to_csv(f"example_data/{filename}", index=False)
+                
+                # Show data preview
+                st.subheader("Data Preview")
+                st.dataframe(df.head(10))
+                
+                # Store in session state
+                st.session_state['category_data'] = df
+                
+                # Auto navigation
+                st.success("Categories data saved successfully. Redirecting to analysis...")
+                st.markdown("<meta http-equiv='refresh' content='2; url=/Category_Analysis'>", unsafe_allow_html=True)
+                st.markdown("[Click here if not redirected](/Category_Analysis)")
+                
+            except Exception as e:
+                st.error(f"Error processing file: {str(e)}")
+                st.info("Please ensure your file is in the correct format.")
+    
+    else:  # Coming Soon option
+        st.info("This API source is coming soon. Please check back later.")
+
+# Tab 3: API Integration
+with tabs[2]:
+    st.header("API Integration")
+    
+    st.markdown("""
+    ### Upload data programmatically via our API
+    
+    You can send data to this application programmatically using our REST API. 
+    This allows you to integrate with your existing systems and automate data analysis.
+    
+    **Base URL**: `http://localhost:5001`
+    
+    #### Upload CSV data via API:
+    
+    ```bash
+    curl -X POST -H "X-API-Key: YOUR_API_KEY" \\
+         -F "file=@your_file.csv" \\
+         http://localhost:5001/api/upload
+    ```
+    
+    #### API Endpoints
+    
+    | Method | Endpoint | Description |
+    |--------|----------|-------------|
+    | POST | `/api/upload` | Upload review data (CSV) |
+    | POST | `/api/upload/review_categories/csv` | Upload category data (CSV) |
+    | POST | `/api/upload/review_categories/json` | Upload category data (JSON) |
+    | GET | `/api/analytics/categories` | Get category analytics |
+    | GET | `/api/analytics/reviews` | Get review analytics |
+    
+    #### Authentication
+    All API requests require the `X-API-Key` header. Contact the administrator to get your API key.
+    """)
+    
+    # Show API Key (for demo purposes)
+    st.warning("For demonstration purposes, your API key is: 8d84126c-4184-4c1f-a7f1-efd247bee990")
+    
+    # Add some example code
+    with st.expander("Python Example Code"):
+        st.code("""
+import requests
+
+# API configuration
+api_key = "YOUR_API_KEY"
+base_url = "http://localhost:5001"
+
+# Upload a CSV file
+def upload_csv(file_path):
+    headers = {
+        "X-API-Key": api_key
+    }
+    
+    with open(file_path, 'rb') as f:
+        files = {
+            'file': (file_path, f, 'text/csv')
+        }
+        
+        response = requests.post(
+            f"{base_url}/api/upload",
+            headers=headers,
+            files=files
+        )
+        
+    return response.json()
+
+# Get analytics
+def get_analytics():
+    headers = {
+        "X-API-Key": api_key
+    }
+    
+    response = requests.get(
+        f"{base_url}/api/analytics/reviews",
+        headers=headers
+    )
+    
+    return response.json()
+
+# Example usage
+csv_path = "reviews.csv"
+result = upload_csv(csv_path)
+print(result)
+
+analytics = get_analytics()
+print(analytics)
+        """, language="python")
+    
+    with st.expander("JavaScript Example Code"):
+        st.code("""
+// Using fetch API in JavaScript
+const apiKey = "YOUR_API_KEY";
+const baseUrl = "http://localhost:5001";
+
+// Upload a CSV file
+async function uploadCSV(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${baseUrl}/api/upload`, {
+        method: 'POST',
+        headers: {
+            'X-API-Key': apiKey
+        },
+        body: formData
+    });
+    
+    return response.json();
+}
+
+// Get analytics
+async function getAnalytics() {
+    const response = await fetch(`${baseUrl}/api/analytics/reviews`, {
+        method: 'GET',
+        headers: {
+            'X-API-Key': apiKey
+        }
+    });
+    
+    return response.json();
+}
+
+// Example usage (in an async function)
+async function example() {
+    const fileInput = document.querySelector('input[type="file"]');
+    const file = fileInput.files[0];
+    
+    const uploadResult = await uploadCSV(file);
+    console.log(uploadResult);
+    
+    const analytics = await getAnalytics();
+    console.log(analytics);
+}
+        """, language="javascript")
+
+# Footer
+st.markdown("---")
+st.caption("Review Aspect Analyzer Tool - Data Upload")
