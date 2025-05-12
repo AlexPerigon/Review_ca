@@ -203,17 +203,12 @@ with tabs[1]:
             ```
             """)
         
-        # Fetch options
-        col1, col2 = st.columns(2)
-        with col1:
-            use_all_endpoint = st.checkbox("Use non-paginated endpoint (/all)", value=True, 
-                                      help="If checked, fetches all categories at once instead of paginating. This is more efficient but may take longer for large datasets.")
-        with col2:
-            use_test_data = st.checkbox("Use test data (no API call)", value=False,
-                                   help="If checked, uses example data instead of making an actual API call")
+        # API fetch options
+        use_all_endpoint = st.checkbox("Use non-paginated endpoint (/all)", value=True, 
+                                    help="If checked, fetches all categories at once instead of paginating. This is more efficient but may take longer for large datasets.")
         
         # Only show sorting options if not using all endpoint
-        if not use_all_endpoint and not use_test_data:
+        if not use_all_endpoint:
             col1, col2 = st.columns(2)
             with col1:
                 sort_by = st.selectbox(
@@ -234,25 +229,13 @@ with tabs[1]:
         
         # Button to fetch data
         if st.button("Fetch Categories from Perigon API"):
-            if use_test_data:
-                with st.spinner("Loading test data from example_data/review_categories.csv..."):
-                    try:
-                        # Load the example data
-                        example_file = "example_data/review_categories.csv"
-                        categories_df = pd.read_csv(example_file)
-                        categories = categories_df.to_dict(orient='records')
-                        st.success(f"Successfully loaded {len(categories)} test categories")
-                    except Exception as e:
-                        st.error(f"Error loading test data: {str(e)}")
-                        categories = {"error": f"Failed to load test data: {str(e)}"}
-            else:
-                with st.spinner(f"Fetching data from Perigon API ({'non-paginated /all' if use_all_endpoint else 'paginated'} endpoint)..."):
-                    # Fetch categories from the API using the selected endpoint
-                    categories = fetch_internal_api_data(
-                        sort_by=sort_by,
-                        sort_order=sort_order,
-                        use_all_endpoint=use_all_endpoint
-                    )
+            with st.spinner(f"Fetching data from Perigon API ({'non-paginated /all' if use_all_endpoint else 'paginated'} endpoint)..."):
+                # Fetch categories from the API using the selected endpoint
+                categories = fetch_internal_api_data(
+                    sort_by=sort_by,
+                    sort_order=sort_order,
+                    use_all_endpoint=use_all_endpoint
+                )
                 
                 if isinstance(categories, dict) and "error" in categories:
                     st.error(f"Error fetching categories: {categories['error']}")
@@ -300,39 +283,8 @@ with tabs[1]:
         - aspects: List of aspects (as a string representation of an array)
         """)
         
-        # Option to use example data for testing
-        use_example_data = st.checkbox("Use example data for testing", value=False, 
-                               help="Use the included example_data/review_categories.csv file for testing")
-        
-        if use_example_data:
-            st.success("✅ Using example category data from example_data/review_categories.csv")
-            
-            try:
-                # Load the example data
-                example_file = "example_data/review_categories.csv"
-                df = pd.read_csv(example_file)
-                
-                # Display a preview
-                st.subheader("Example Data Preview")
-                st.dataframe(df.head(5))
-                
-                # Option to use for analysis
-                if st.button("Use This Example Data for Analysis"):
-                    # Store in session state
-                    st.session_state['category_data'] = df
-                    
-                    # Auto-navigate to analysis page
-                    st.success("✅ Example data loaded for analysis! Redirecting to Category Analysis page...")
-                    st.markdown("<meta http-equiv='refresh' content='2; url=/Category_Analysis'>", unsafe_allow_html=True)
-                    st.markdown("[Click here if not redirected](/Category_Analysis)")
-            
-            except Exception as e:
-                st.error(f"Error loading example data: {str(e)}")
-        
-        # File uploader (only show if not using example data)
-        uploaded_file = None
-        if not use_example_data:
-            uploaded_file = st.file_uploader("Choose a CSV or JSON file", type=["csv", "json"])
+        # File uploader
+        uploaded_file = st.file_uploader("Choose a CSV or JSON file", type=["csv", "json"])
         
         if uploaded_file is not None:
             try:
@@ -396,6 +348,14 @@ with tabs[2]:
     
     **Base URL**: `http://localhost:5001`
     
+    #### Upload CSV data via API:
+    
+    ```bash
+    curl -X POST -H "X-API-Key: YOUR_API_KEY" \\
+         -F "file=@your_file.csv" \\
+         http://localhost:5001/api/upload
+    ```
+    
     #### API Endpoints
     
     | Method | Endpoint | Description |
@@ -405,141 +365,6 @@ with tabs[2]:
     | POST | `/api/upload/review_categories/json` | Upload category data (JSON) |
     | GET | `/api/analytics/categories` | Get category analytics |
     | GET | `/api/analytics/reviews` | Get review analytics |
-    """)
-    
-    # API Examples with tabs
-    api_examples = st.tabs(["Upload CSV", "Upload JSON", "Get Analytics"])
-    
-    with api_examples[0]:
-        st.markdown("""
-        #### Upload Categories CSV Example
-        
-        ```bash
-        # Upload a CSV file with category data
-        curl -X POST -H "X-API-Key: 8d84126c-4184-4c1f-a7f1-efd247bee990" \\
-             -F "file=@example_data/review_categories.csv" \\
-             http://localhost:5001/api/upload/review_categories/csv
-        ```
-        """)
-        
-        # Add a button to test this API
-        if st.button("Test Upload CSV API", key="test_upload_csv"):
-            with st.spinner("Testing the API - Uploading CSV..."):
-                # Use subprocess to run the curl command
-                import subprocess
-                import json
-                
-                try:
-                    cmd = [
-                        "curl", "-s", "-X", "POST", 
-                        "-H", "X-API-Key: 8d84126c-4184-4c1f-a7f1-efd247bee990",
-                        "-F", "file=@example_data/review_categories.csv",
-                        "http://localhost:5001/api/upload/review_categories/csv"
-                    ]
-                    result = subprocess.run(cmd, capture_output=True, text=True)
-                    
-                    if result.returncode == 0:
-                        try:
-                            data = json.loads(result.stdout)
-                            st.success("API call successful!")
-                            st.json(data)
-                        except json.JSONDecodeError:
-                            st.error("API response was not valid JSON")
-                            st.text(result.stdout)
-                    else:
-                        st.error(f"API call failed: {result.stderr}")
-                except Exception as e:
-                    st.error(f"Error executing API call: {str(e)}")
-    
-    with api_examples[1]:
-        st.markdown("""
-        #### Upload Categories JSON Example
-        
-        ```bash
-        # Upload category data in JSON format
-        curl -X POST -H "X-API-Key: 8d84126c-4184-4c1f-a7f1-efd247bee990" \\
-             -H "Content-Type: application/json" \\
-             -d '[{"id":1,"name":"Test Category","aspectsCount":2,"aspects":["Quality","Price"]}]' \\
-             http://localhost:5001/api/upload/review_categories/json
-        ```
-        """)
-        
-        # Add a button to test this API
-        if st.button("Test Upload JSON API", key="test_upload_json"):
-            with st.spinner("Testing the API - Uploading JSON..."):
-                import subprocess
-                import json
-                
-                try:
-                    # Create a simple JSON payload
-                    payload = json.dumps([{
-                        "id": 999, 
-                        "name": "Test Category", 
-                        "aspectsCount": 3,
-                        "aspects": ["Quality", "Price", "Support"]
-                    }])
-                    
-                    cmd = [
-                        "curl", "-s", "-X", "POST",
-                        "-H", "X-API-Key: 8d84126c-4184-4c1f-a7f1-efd247bee990",
-                        "-H", "Content-Type: application/json",
-                        "-d", payload,
-                        "http://localhost:5001/api/upload/review_categories/json"
-                    ]
-                    
-                    result = subprocess.run(cmd, capture_output=True, text=True)
-                    
-                    if result.returncode == 0:
-                        try:
-                            data = json.loads(result.stdout)
-                            st.success("API call successful!")
-                            st.json(data)
-                        except json.JSONDecodeError:
-                            st.error("API response was not valid JSON")
-                            st.text(result.stdout)
-                    else:
-                        st.error(f"API call failed: {result.stderr}")
-                except Exception as e:
-                    st.error(f"Error executing API call: {str(e)}")
-    
-    with api_examples[2]:
-        st.markdown("""
-        #### Get Category Analytics Example
-        
-        ```bash
-        # Get analytics for categories
-        curl -X GET -H "X-API-Key: 8d84126c-4184-4c1f-a7f1-efd247bee990" \\
-             http://localhost:5001/api/analytics/categories
-        ```
-        """)
-        
-        # Add a button to test this API
-        if st.button("Test Get Analytics API", key="test_get_analytics"):
-            with st.spinner("Testing the API - Getting Analytics..."):
-                import subprocess
-                import json
-                
-                try:
-                    cmd = [
-                        "curl", "-s", "-X", "GET",
-                        "-H", "X-API-Key: 8d84126c-4184-4c1f-a7f1-efd247bee990",
-                        "http://localhost:5001/api/analytics/categories"
-                    ]
-                    
-                    result = subprocess.run(cmd, capture_output=True, text=True)
-                    
-                    if result.returncode == 0:
-                        try:
-                            data = json.loads(result.stdout)
-                            st.success("API call successful!")
-                            st.json(data)
-                        except json.JSONDecodeError:
-                            st.error("API response was not valid JSON")
-                            st.text(result.stdout)
-                    else:
-                        st.error(f"API call failed: {result.stderr}")
-                except Exception as e:
-                    st.error(f"Error executing API call: {str(e)}")
     
     #### Authentication
     All API requests require the `X-API-Key` header. Contact the administrator to get your API key.
