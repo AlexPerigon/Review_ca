@@ -188,3 +188,101 @@ class InternalAPIClient:
             processed_results.append(processed_item)
             
         return processed_results
+        
+    def get_all_review_categories(self):
+        """
+        Fetch all review categories without pagination.
+        
+        Returns:
+        --------
+        list
+            Combined results with all categories (no pagination) with expected fields:
+            - id (int)
+            - createdAt (datetime string)
+            - updatedAt (datetime string)
+            - name (string)
+            - caCategoryId (string)
+            - rulesPath (string, nullable)
+            - aspects (list of strings)
+            - aspectsCount (int)
+        """
+        if not self.shared_secret:
+            logger.error("Cannot make API request: SHARED_SECRET is not set")
+            return {
+                "error": "API authentication is not configured. Please set the SHARED_SECRET environment variable."
+            }
+        
+        # Endpoint for all review categories with sharedSecret as query parameter
+        endpoint = f"{self.base_url}/ca/reviewCategory/all"
+        
+        # Request headers
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        # Only need authentication parameter
+        params = {
+            "sharedSecret": self.shared_secret  # Using sharedSecret as query parameter
+        }
+        
+        try:
+            # Make the API request
+            response = requests.get(endpoint, headers=headers, params=params)
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                # Process the response data
+                response_data = response.json()
+                
+                # Check if we got the expected format (list or data field)
+                if isinstance(response_data, list):
+                    data = response_data
+                elif isinstance(response_data, dict) and "data" in response_data:
+                    data = response_data.get("data", [])
+                else:
+                    logger.error("Unexpected API response format")
+                    return {
+                        "error": "Unexpected API response format",
+                        "details": "The response was not in the expected format"
+                    }
+                
+                # Process the results to ensure all expected fields are present
+                processed_results = []
+                for item in data:
+                    processed_item = {
+                        'id': item.get('id'),
+                        'name': item.get('name', ''),
+                        'createdAt': item.get('createdAt', ''),
+                        'updatedAt': item.get('updatedAt', ''),
+                        'caCategoryId': item.get('caCategoryId', ''),
+                        'rulesPath': item.get('rulesPath', ''),
+                        'aspectsCount': len(item.get('aspects', []))
+                    }
+                    
+                    # Optionally include aspects if present
+                    if 'aspects' in item and item['aspects']:
+                        processed_item['aspects'] = [aspect.get('name', '') for aspect in item['aspects']]
+                        
+                    processed_results.append(processed_item)
+                    
+                return processed_results
+            else:
+                logger.error(f"API request failed with status {response.status_code}: {response.text}")
+                return {
+                    "error": f"API request failed with status {response.status_code}",
+                    "details": response.text
+                }
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error: {str(e)}")
+            return {
+                "error": "Error connecting to the API",
+                "details": str(e)
+            }
+        except json.JSONDecodeError:
+            logger.error("Error decoding API response")
+            return {
+                "error": "Error decoding API response",
+                "details": "The API response was not valid JSON"
+            }
