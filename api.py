@@ -20,7 +20,14 @@ from internal_api import InternalAPIClient
 app = Flask(__name__)
 
 # Configuration - you'll need to set this in environment variables
-API_KEY = os.environ.get('API_KEY', 'default_dev_key')  # Default for development only
+API_KEY = os.environ.get('API_KEY', '8d84126c-4184-4c1f-a7f1-efd247bee990')  # Default API key
+
+def verify_api_key():
+    """Check if the provided API key is valid"""
+    provided_key = request.headers.get('X-API-Key')
+    if not provided_key or provided_key != API_KEY:
+        return False
+    return True
 
 # Directory for storing uploaded files
 UPLOAD_DIR = 'uploads'
@@ -29,8 +36,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @app.route('/api/upload', methods=['POST'])
 def upload_data():
     # Check API key authentication
-    provided_key = request.headers.get('X-API-Key')
-    if not provided_key or provided_key != API_KEY:
+    if not verify_api_key():
         return jsonify({"error": "Invalid or missing API key"}), 403
     
     # Check if file was included in the request
