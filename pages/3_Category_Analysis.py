@@ -24,38 +24,63 @@ st.set_page_config(
     layout="wide"
 )
 
-# App title and description
-st.title("Category & Aspect Analysis")
-st.markdown("""
-This page provides analytics specifically for review categories and their aspects,
-based on data from the internal API.
-""")
+# Create a main function with authentication
+@auth_required
+def main():
+    # App title and description
+    st.title("Category & Aspect Analysis")
+    st.markdown("""
+    This page provides analytics specifically for review categories and their aspects,
+    based on data from the internal API.
+    """)
+    
+    # Data source selection
+    data_source = st.radio(
+        "Select data source:",
+        ["Load from file", "Fetch from API (all categories)"],
+        index=0
+    )
+    
+    # Load the category data based on selection
+    if data_source == "Load from file":
+        category_data = load_category_data()
+        st.info("Loaded category data from saved file.")
+    else:
+        with st.spinner("Fetching all categories from API..."):
+            category_data = fetch_all_internal_api_data()
+            if isinstance(category_data, dict) and "error" in category_data:
+                st.error(f"Error fetching categories: {category_data['error']}")
+                if "details" in category_data:
+                    st.error(f"Details: {category_data['details']}")
+                category_data = None
+            else:
+                st.success(f"Successfully fetched {len(category_data)} categories from the API")
+                # Convert to DataFrame
+                category_data = pd.DataFrame(category_data)
 
-# Load the category data
-category_data = load_category_data()
+    # Check if data is loaded successfully
+    if category_data is None:
+        st.error("Failed to load category data. Please check the file path and format.")
+        st.stop()
 
-if category_data is None:
-    st.error("Failed to load category data. Please check the file path and format.")
-    st.stop()
+    # Display some basic stats
+    total_categories = len(category_data)
+    categories_with_aspects = len(category_data[category_data['aspectsCount'] > 0])
+    categories_without_aspects = total_categories - categories_with_aspects
 
-# Display some basic stats
-total_categories = len(category_data)
-categories_with_aspects = len(category_data[category_data['aspectsCount'] > 0])
-categories_without_aspects = total_categories - categories_with_aspects
+    # Create a summary section
+    st.header("Summary Statistics")
+    col1, col2, col3, col4 = st.columns(4)
 
-# Create a summary section
-st.header("Summary Statistics")
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("Total Categories", total_categories)
-with col2:
-    st.metric("Categories with Aspects", categories_with_aspects)
-with col3:
-    st.metric("Categories without Aspects", categories_without_aspects)
-with col4:
-    avg_aspects = category_data['aspectsCount'].mean()
-    st.metric("Avg Aspects per Category", f"{avg_aspects:.1f}")
+    with col1:
+        st.metric("Total Categories", total_categories)
+    with col2:
+        st.metric("Categories with Aspects", categories_with_aspects)
+    with col3:
+        st.metric("Categories without Aspects", categories_without_aspects)
+    with col4:
+        avg_aspects = category_data['aspectsCount'].mean()
+        st.metric("Avg Aspects per Category", f"{avg_aspects:.1f}")
 
 # Create tabs for different analysis views
 tabs = st.tabs([
