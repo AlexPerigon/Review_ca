@@ -325,6 +325,9 @@ with tabs[3]:
     with col2:
         st.markdown(get_json_download_link(category_data, "category_data.json"), unsafe_allow_html=True)
 
-# Footer
-st.markdown("---")
-st.caption("Review Aspect Analyzer Tool - Category Analysis")
+    # Footer
+    st.markdown("---")
+    st.caption("Review Aspect Analyzer Tool - Category Analysis")
+
+# Call the main function
+main()
