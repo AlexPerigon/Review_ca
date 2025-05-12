@@ -3,58 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 import glob
-import hashlib
 from utils import generate_example_csv, get_csv_download_link
-
-# Initialize session state for authentication
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-# API Key for authentication
-API_KEY = os.environ.get('API_KEY', '8d84126c-4184-4c1f-a7f1-efd247bee990')  # Default API key
-
-# Authentication functions
-def verify_api_key(input_key):
-    """Verify the provided API key"""
-    return input_key == API_KEY
-
-def login_form():
-    """Display login form and handle authentication"""
-    st.markdown("<h1 style='text-align: center;'>Review Aspect Analyzer</h1>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center;'>Please log in to continue</h3>", unsafe_allow_html=True)
-    
-    # Create a centered login form
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.write("")
-        st.write("")
-        
-        # Login form
-        with st.form("login_form"):
-            api_key = st.text_input("API Key", type="password")
-            submit_button = st.form_submit_button("Log In")
-            
-            if submit_button:
-                if verify_api_key(api_key):
-                    st.session_state.authenticated = True
-                    st.success("Login successful! Redirecting...")
-                    st.rerun()
-                else:
-                    st.error("Invalid API key. Please try again.")
-        
-        st.info("For demonstration, use API key: 8d84126c-4184-4c1f-a7f1-efd247bee990")
-        
-        # Additional help text
-        with st.expander("Need help?"):
-            st.markdown("""
-            **API Key Access**
-            
-            Contact your system administrator to get an API key. The API key is used for:
-            1. Logging into this application
-            2. Making API requests programmatically
-            3. Accessing internal data
-            """)
 
 # Page configuration
 st.set_page_config(
@@ -64,16 +13,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Check if user is authenticated
-if not st.session_state.authenticated:
-    # If not authenticated, show login form
-    login_form()
-else:
-    # User is authenticated, show the main content
-    
-    # App title and description
-    st.title("Customer Review Aspect Analyzer")
-    st.markdown("""
+# App title and description
+st.title("Customer Review Aspect Analyzer")
+st.markdown("""
 This application helps product managers analyze aspect and category tagging in customer reviews.
 Upload or import review data to see aspects organized by category and gain insights into your review pipeline.
 
