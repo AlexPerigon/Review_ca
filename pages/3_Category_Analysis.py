@@ -250,7 +250,11 @@ with tabs[1]:
             
             # Download the full matrix
             st.markdown("### Download Full Matrix")
-            st.markdown(get_csv_download_link(matrix_df, "aspect_category_matrix.csv"), unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(get_csv_download_link(matrix_df, "aspect_category_matrix.csv"), unsafe_allow_html=True)
+            with col2:
+                st.markdown(get_json_download_link(matrix_df, "aspect_category_matrix.json"), unsafe_allow_html=True)
     else:
         st.error("Analysis results are not available.")
 
@@ -269,7 +273,11 @@ with tabs[2]:
             
             # Create a download button for this data
             st.markdown("### Download List")
-            st.markdown(get_csv_download_link(categories_no_aspects, "categories_without_aspects.csv"), unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(get_csv_download_link(categories_no_aspects, "categories_without_aspects.csv"), unsafe_allow_html=True)
+            with col2:
+                st.markdown(get_json_download_link(categories_no_aspects, "categories_without_aspects.json"), unsafe_allow_html=True)
         else:
             st.success("All categories have aspects defined!")
     else:
@@ -284,7 +292,11 @@ with tabs[3]:
     
     # Download options
     st.markdown("### Download Data")
-    st.markdown(get_csv_download_link(category_data, "category_data.csv"), unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(get_csv_download_link(category_data, "category_data.csv"), unsafe_allow_html=True)
+    with col2:
+        st.markdown(get_json_download_link(category_data, "category_data.json"), unsafe_allow_html=True)
 
 # Footer
 st.markdown("---")
