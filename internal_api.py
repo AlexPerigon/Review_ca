@@ -188,3 +188,101 @@ class InternalAPIClient:
             processed_results.append(processed_item)
             
         return processed_results
+        
+    def get_all_review_categories(self, sort_by="id", sort_order="asc"):
+        """
+        Fetch all review categories at once without pagination.
+        
+        This function calls the special /reviewCategory/all endpoint that returns
+        all categories in a single request.
+        
+        Parameters:
+        -----------
+        sort_by : str
+            Field to sort by (default: "id")
+        sort_order : str
+            Sort order, "asc" or "desc" (default: "asc")
+            
+        Returns:
+        --------
+        list
+            All categories with expected fields:
+            - id (int)
+            - createdAt (datetime string)
+            - updatedAt (datetime string)
+            - name (string)
+            - caCategoryId (string)
+            - rulesPath (string, nullable)
+            - aspects (list of aspect names)
+            - aspectsCount (int)
+        """
+        if not self.shared_secret:
+            logger.error("Cannot make API request: SHARED_SECRET is not set")
+            return {
+                "error": "API authentication is not configured. Please set the SHARED_SECRET environment variable."
+            }
+        
+        # Endpoint for all review categories without pagination
+        endpoint = f"{self.base_url}/ca/reviewCategory/all"
+        
+        # Request headers
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        
+        # Parameters (only authentication and sorting)
+        params = {
+            "sharedSecret": self.shared_secret,
+            "sortBy": sort_by,
+            "sortOrder": sort_order
+        }
+        
+        try:
+            # Make the API request
+            response = requests.get(endpoint, headers=headers, params=params)
+            
+            # Check if request was successful
+            if response.status_code == 200:
+                # Process the response data
+                data = response.json()
+                
+                # Convert to the same format as the paginated results
+                processed_results = []
+                for item in data:
+                    processed_item = {
+                        'id': item.get('id'),
+                        'name': item.get('name', ''),
+                        'createdAt': item.get('createdAt', ''),
+                        'updatedAt': item.get('updatedAt', ''),
+                        'caCategoryId': item.get('caCategoryId', ''),
+                        'rulesPath': item.get('rulesPath', ''),
+                        'aspectsCount': len(item.get('aspects', []))
+                    }
+                    
+                    # Include aspects if present
+                    if 'aspects' in item and item['aspects']:
+                        processed_item['aspects'] = [aspect.get('name', '') for aspect in item['aspects']]
+                    
+                    processed_results.append(processed_item)
+                
+                return processed_results
+            else:
+                logger.error(f"API request failed with status {response.status_code}: {response.text}")
+                return {
+                    "error": f"API request failed with status {response.status_code}",
+                    "details": response.text
+                }
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error: {str(e)}")
+            return {
+                "error": "Error connecting to the API",
+                "details": str(e)
+            }
+        except json.JSONDecodeError:
+            logger.error("Error decoding API response")
+            return {
+                "error": "Error decoding API response",
+                "details": "The API response was not valid JSON"
+            }

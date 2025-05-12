@@ -140,21 +140,28 @@ with tabs[1]:
             st.markdown("""
             ### Perigon Review Categories API
             
-            This app can connect to your internal API endpoint at:
+            This app can connect to your internal API endpoints at:
+            
+            **Standard endpoint (with pagination)**
             ```
             https://api.perigon.io/v1/internal/ca/reviewCategory/
+            ```
+            
+            **All categories endpoint (no pagination)**
+            ```
+            https://api.perigon.io/v1/internal/ca/reviewCategory/all
             ```
             
             **Authentication**:
             - Uses the SHARED_SECRET as a query parameter
             
-            **Pagination Parameters**:
+            **Pagination Parameters** (standard endpoint only):
             - page (default: 0) - The page number to retrieve
             - size (default: 20) - Number of items per page
             - sortBy (default: "id") - Field to sort by
             - sortOrder (default: "asc") - Sort order
             
-            **Response Structure**:
+            **Response Structure** (standard endpoint):
             ```json
             {
               "total": 123,  // Total number of records
@@ -178,7 +185,7 @@ with tabs[1]:
             """)
         
         # API fetch options
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             sort_by = st.selectbox(
                 "Sort by field", 
@@ -191,14 +198,19 @@ with tabs[1]:
                 options=["asc", "desc"],
                 index=0
             )
+        with col3:
+            use_all_endpoint = st.checkbox("Use /all endpoint (no pagination)", value=True, 
+                                          help="Fetches all categories at once without pagination")
         
         # Button to fetch data
-        if st.button("Fetch Categories from Perigon API"):
+        fetch_button_label = "Fetch All Categories" if use_all_endpoint else "Fetch Categories (paginated)"
+        if st.button(fetch_button_label):
             with st.spinner("Fetching data from Perigon API..."):
                 # Fetch categories from the API
                 categories = fetch_internal_api_data(
                     sort_by=sort_by,
-                    sort_order=sort_order
+                    sort_order=sort_order,
+                    use_all_endpoint=use_all_endpoint
                 )
                 
                 if isinstance(categories, dict) and "error" in categories:

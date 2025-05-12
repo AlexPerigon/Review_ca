@@ -188,12 +188,37 @@ def get_api_uploaded_files():
     return [os.path.join(UPLOAD_DIR, f) for f in os.listdir(UPLOAD_DIR) if f.endswith('.csv')]
 
 # Function to fetch data from internal API
-def fetch_internal_api_data(sort_by="id", sort_order="asc"):
+def fetch_internal_api_data(sort_by="id", sort_order="asc", use_all_endpoint=False):
+    """
+    Fetch category data from the internal API
+    
+    Parameters:
+    -----------
+    sort_by : str
+        Field to sort by
+    sort_order : str
+        Sort order ('asc' or 'desc')
+    use_all_endpoint : bool
+        If True, use the /reviewCategory/all endpoint without pagination
+        If False, use the paginated endpoint with automatic page fetching
+        
+    Returns:
+    --------
+    list or dict
+        List of categories or error dict
+    """
     api_client = InternalAPIClient()
-    return api_client.get_review_categories_paginated(
-        sort_by=sort_by,
-        sort_order=sort_order
-    )
+    
+    if use_all_endpoint:
+        return api_client.get_all_review_categories(
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+    else:
+        return api_client.get_review_categories_paginated(
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
 
 # Get top aspects overall
 def get_top_aspects(analysis_df, top_n=10):
