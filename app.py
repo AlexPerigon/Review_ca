@@ -64,9 +64,25 @@ def get_csv_download_link(df, filename="analysis_export.csv"):
 
 # Function to process the uploaded CSV file
 def process_csv(uploaded_file):
-    """Process the uploaded CSV file and return a DataFrame"""
+    """Process the uploaded CSV file and return a DataFrame
+    
+    Parameters:
+    -----------
+    uploaded_file : Union[UploadedFile, str]
+        Either a Streamlit UploadedFile object or a path to a file
+    
+    Returns:
+    --------
+    DataFrame or None
+        The processed DataFrame or None if an error occurred
+    """
     try:
-        df = pd.read_csv(uploaded_file)
+        # Check if uploaded_file is a string (path to a file uploaded via API)
+        if isinstance(uploaded_file, str):
+            df = pd.read_csv(uploaded_file)
+        else:
+            # Regular Streamlit file upload
+            df = pd.read_csv(uploaded_file)
         
         # Check if required columns exist
         required_columns = ['review_id', 'review_text', 'category', 'aspects']
@@ -260,39 +276,42 @@ if uploaded_file is not None:
             st.subheader("Aspect Analysis Table")
             st.markdown("Aspects appearing in less than 5% of reviews are highlighted in red.")
             
-            # Create a copy of the filtered analysis for display
-            display_columns = ['category', 'aspect', 'count', 'total_reviews', 'percentage', 'is_low_percentage']
-            display_df = filtered_analysis[display_columns].copy()
+            # Create simplified view of data for display
+            display_cols = ['category', 'aspect', 'count', 'total_reviews', 'percentage']
             
-            # Create a styled version for display - simpler approach for Streamlit compatibility
-            display_df_visual = display_df[display_columns[:-1]].copy()  # Don't show the is_low_percentage column
+            # Create a plain table display for all data
+            st.markdown("<h3>Analysis Results</h3>", unsafe_allow_html=True)
             
-            # Highlight rows with conditional formatting
-            st.markdown("### Aspect Analysis Table")
-            st.markdown("Aspects appearing in less than 5% of reviews are highlighted in red.")
+            # Group data by is_low_percentage status for easier display
+            # Convert is_low_percentage to Python boolean values to avoid pandas Series issues
+            is_low_mask = [bool(val) for val in filtered_analysis['is_low_percentage']]
+            is_normal_mask = [not val for val in is_low_mask]
             
-            # Display the dataframe with dynamic styling based on is_low_percentage
-            for i, row in display_df.iterrows():
+            # Since we have issues with boolean masks, let's take a different approach
+            # Create lists to store the data for low percentage and normal aspects
+            low_aspects_data = []
+            normal_aspects_data = []
+            
+            # Manually iterate through filtered_analysis and separate the data
+            for i in range(len(filtered_analysis)):
+                row = filtered_analysis.iloc[i]
+                row_data = {col: row[col] for col in display_cols}
+                
                 if row['is_low_percentage']:
-                    st.markdown(f"""
-                    <div style="background-color: #FFCCCC; padding: 10px; margin: 5px 0; border-radius: 5px;">
-                        <b>Category:</b> {row['category']} | 
-                        <b>Aspect:</b> {row['aspect']} | 
-                        <b>Count:</b> {row['count']} | 
-                        <b>Total Reviews:</b> {row['total_reviews']} | 
-                        <b>Percentage:</b> {row['percentage']}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    low_aspects_data.append(row_data)
                 else:
-                    st.markdown(f"""
-                    <div style="background-color: #f0f2f6; padding: 10px; margin: 5px 0; border-radius: 5px;">
-                        <b>Category:</b> {row['category']} | 
-                        <b>Aspect:</b> {row['aspect']} | 
-                        <b>Count:</b> {row['count']} | 
-                        <b>Total Reviews:</b> {row['total_reviews']} | 
-                        <b>Percentage:</b> {row['percentage']}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    normal_aspects_data.append(row_data)
+            
+            # Display low percentage aspects with a warning
+            if low_aspects_data:
+                st.markdown("##### Low Percentage Aspects (< 5%)")
+                st.markdown("These aspects appear in less than 5% of reviews for their category:")
+                st.dataframe(pd.DataFrame(low_aspects_data), use_container_width=True)
+            
+            # Display normal aspects
+            if normal_aspects_data:
+                st.markdown("##### Regular Aspects")
+                st.dataframe(pd.DataFrame(normal_aspects_data), use_container_width=True)
             
             # Display pivot table for all categories
             if selected_category == "All Categories" and len(categories) > 1:
@@ -317,11 +336,14 @@ if uploaded_file is not None:
             )
             
             if st.button("Generate Export"):
+                # Define export columns (without is_low_percentage)
+                export_columns = ['category', 'aspect', 'count', 'total_reviews', 'percentage']
+                
                 if export_type == "Current filtered view":
-                    export_df = filtered_analysis[display_columns]
+                    export_df = filtered_analysis[export_columns]
                     filename = f"aspect_analysis_{selected_category.replace(' ', '_')}.csv"
                 elif export_type == "Complete analysis":
-                    export_df = analysis_df[display_columns]
+                    export_df = analysis_df[export_columns]
                     filename = "complete_aspect_analysis.csv"
                 else:  # Pivot table
                     export_df = pivot_df
