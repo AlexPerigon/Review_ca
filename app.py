@@ -4,6 +4,7 @@ import numpy as np
 import os
 import glob
 from utils import generate_example_csv, get_csv_download_link
+from auth import auth_required, check_authentication, logout
 
 # Page configuration
 st.set_page_config(
@@ -14,8 +15,11 @@ st.set_page_config(
 )
 
 # App title and description
-st.title("Customer Review Aspect Analyzer")
-st.markdown("""
+# Apply authentication
+@auth_required
+def main_app():
+    st.title("Customer Review Aspect Analyzer")
+    st.markdown("""
 This application helps product managers analyze aspect and category tagging in customer reviews.
 Upload or import review data to see aspects organized by category and gain insights into your review pipeline.
 
@@ -28,37 +32,37 @@ Upload or import review data to see aspects organized by category and gain insig
 - Export results for further analysis
 """)
 
-# Show a visual workflow
-st.subheader("How It Works")
-cols = st.columns(4)
-with cols[0]:
-    st.info("1. Import Data")
-    st.markdown("""
-    - Upload a CSV file
-    - Import from internal API
-    - Upload via API endpoint
-    """)
-with cols[1]:
-    st.success("2. Process & Validate")
-    st.markdown("""
-    - Verify required columns
-    - Format checking
-    - Data preparation
-    """)
-with cols[2]:
-    st.warning("3. Analyze Aspects")
-    st.markdown("""
-    - Categorize aspects
-    - Calculate percentages
-    - Identify patterns
-    """)
-with cols[3]:
-    st.error("4. Visualize & Export")
-    st.markdown("""
-    - View analytics charts
-    - Filter results
-    - Export as CSV
-    """)
+    # Show a visual workflow
+    st.subheader("How It Works")
+    cols = st.columns(4)
+    with cols[0]:
+        st.info("1. Import Data")
+        st.markdown("""
+        - Upload a CSV file
+        - Import from internal API
+        - Upload via API endpoint
+        """)
+    with cols[1]:
+        st.success("2. Process & Validate")
+        st.markdown("""
+        - Verify required columns
+        - Format checking
+        - Data preparation
+        """)
+    with cols[2]:
+        st.warning("3. Analyze Aspects")
+        st.markdown("""
+        - Categorize aspects
+        - Calculate percentages
+        - Identify patterns
+        """)
+    with cols[3]:
+        st.error("4. Visualize & Export")
+        st.markdown("""
+        - View analytics charts
+        - Filter results
+        - Export as CSV
+        """)
 
 # Sidebar information
 with st.sidebar:
@@ -124,6 +128,17 @@ with col3:
     [Go to Category Analysis](/Category_Analysis)
     """)
 
-# Footer
-st.markdown("---")
-st.caption("Review Aspect Analyzer Tool v1.0")
+    # Footer
+    st.markdown("---")
+    st.caption("Review Aspect Analyzer Tool v1.0")
+
+# Add logout option to sidebar if user is authenticated
+if check_authentication():
+    with st.sidebar:
+        st.markdown("---")
+        if st.button("Logout"):
+            logout()
+            st.rerun()
+
+# Run the main app
+main_app()

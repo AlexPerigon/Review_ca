@@ -93,7 +93,7 @@ def display_login_page():
     if st.button("Login"):
         if authenticate(api_key):
             st.success("✅ Authentication successful!")
-            st.experimental_rerun()  # Rerun the app to show content
+            st.rerun()  # Rerun the app to show content
         else:
             st.error("❌ Invalid API key. Please try again.")
 
