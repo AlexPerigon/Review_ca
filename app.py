@@ -38,14 +38,63 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Add button to import data from the internal API
+    # Add panel to import data from the internal API
     st.subheader("Import from Internal API")
+    
+    # Expand section about the API
+    with st.expander("About the Internal API Integration"):
+        st.markdown("""
+        ### Internal API Integration
+        
+        This app can connect to your internal API endpoint at:
+        ```
+        https://api.perigon.io/v1/internal/ca/reviewCategory/
+        ```
+        
+        **Authentication**:
+        - Uses the SHARED_SECRET as a query parameter
+        
+        **Pagination Parameters**:
+        - page (default: 0) - The page number to retrieve
+        - size (default: 20) - Number of items per page
+        - sortBy (default: "id") - Field to sort by
+        - sortOrder (default: "asc") - Sort order
+        
+        **Response Fields**:
+        - id - Category ID
+        - name - Category name
+        - createdAt - Creation timestamp
+        - updatedAt - Last update timestamp
+        - caCategoryId - Category ID in CA system
+        - rulesPath - Path to rules (if any)
+        - aspects - List of aspects for this category
+        """)
+    
+    # API fetch options
+    col1, col2 = st.columns(2)
+    with col1:
+        sort_by = st.selectbox(
+            "Sort by field", 
+            options=["id", "name", "createdAt", "updatedAt"],
+            index=0
+        )
+    with col2:
+        sort_order = st.selectbox(
+            "Sort order", 
+            options=["asc", "desc"],
+            index=0
+        )
+    
+    # Button to fetch data
     if st.button("Fetch Categories from Internal API"):
         with st.spinner("Fetching data from internal API..."):
             # Initialize the API client
             api_client = InternalAPIClient()
-            # Fetch categories from the API
-            categories = api_client.get_review_categories_paginated()
+            # Fetch categories from the API with user-selected sort options
+            categories = api_client.get_review_categories_paginated(
+                sort_by=sort_by,
+                sort_order=sort_order
+            )
             
             if isinstance(categories, dict) and "error" in categories:
                 st.error(f"Error fetching categories: {categories['error']}")

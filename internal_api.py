@@ -18,7 +18,7 @@ class InternalAPIClient:
         if not self.shared_secret:
             logger.warning("SHARED_SECRET environment variable is not set.")
         
-    def get_review_categories(self, page=0, size=20, sort="id,asc"):
+    def get_review_categories(self, page=0, size=10, sort_by="id", sort_order="asc"):
         """
         Fetch review categories from the internal API.
         
@@ -28,8 +28,10 @@ class InternalAPIClient:
             Page number for pagination (0-indexed)
         size : int
             Number of items per page
-        sort : str
-            Sort criteria (field,direction)
+        sort_by : str
+            Field to sort by
+        sort_order : str
+            Sort order ('asc' or 'desc')
             
         Returns:
         --------
@@ -42,21 +44,22 @@ class InternalAPIClient:
                 "error": "API authentication is not configured. Please set the SHARED_SECRET environment variable."
             }
         
-        # Endpoint for review categories
-        endpoint = f"{self.base_url}/ca/reviewCategory"
+        # Endpoint for review categories with sharedSecret as query parameter
+        endpoint = f"{self.base_url}/ca/reviewCategory/"
         
-        # Request headers with authentication
+        # Request headers
         headers = {
             "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-Shared-Secret": self.shared_secret
+            "Accept": "application/json"
         }
         
-        # Pagination parameters
+        # Pagination parameters matching the PaginationSortParams structure
         params = {
+            "sharedSecret": self.shared_secret,  # Using sharedSecret as query parameter
             "page": page,
             "size": size,
-            "sort": sort
+            "sortBy": sort_by,
+            "sortOrder": sort_order
         }
         
         try:
@@ -86,7 +89,7 @@ class InternalAPIClient:
                 "details": "The API response was not valid JSON"
             }
             
-    def get_review_categories_paginated(self, max_pages=5):
+    def get_review_categories_paginated(self, max_pages=5, sort_by="id", sort_order="asc"):
         """
         Fetch all review categories with pagination.
         
@@ -94,31 +97,49 @@ class InternalAPIClient:
         -----------
         max_pages : int
             Maximum number of pages to fetch
+        sort_by : str
+            Field to sort by (default: "id")
+        sort_order : str
+            Sort order, "asc" or "desc" (default: "asc")
             
         Returns:
         --------
         list
-            Combined results from all pages
+            Combined results from all pages with expected fields:
+            - id (int)
+            - createdAt (datetime string)
+            - updatedAt (datetime string)
+            - name (string)
+            - caCategoryId (string)
+            - rulesPath (string, nullable)
+            - aspects (list of CAReviewAspectDto)
         """
         all_results = []
         page = 0
-        size = 50  # Larger page size for efficiency
+        size = 20  # Reasonable page size
         
         while page < max_pages:
-            response = self.get_review_categories(page=page, size=size)
+            response = self.get_review_categories(
+                page=page, 
+                size=size, 
+                sort_by=sort_by,
+                sort_order=sort_order
+            )
             
-            if "error" in response:
+            if isinstance(response, dict) and "error" in response:
                 return response
             
-            # Check if we got valid content
-            if "content" not in response:
+            # Check if we got valid content (API response structure)
+            if not isinstance(response, dict) or "content" not in response:
                 return {
                     "error": "Unexpected API response format",
                     "details": "The 'content' field is missing from the response"
                 }
                 
             # Add results to our collection
-            all_results.extend(response["content"])
+            content = response.get("content", [])
+            if content:
+                all_results.extend(content)
             
             # Check if this is the last page
             try:
@@ -131,4 +152,23 @@ class InternalAPIClient:
                 
             page += 1
             
-        return all_results
+        # Process the results to ensure all expected fields are present
+        processed_results = []
+        for item in all_results:
+            processed_item = {
+                'id': item.get('id'),
+                'name': item.get('name', ''),
+                'createdAt': item.get('createdAt', ''),
+                'updatedAt': item.get('updatedAt', ''),
+                'caCategoryId': item.get('caCategoryId', ''),
+                'rulesPath': item.get('rulesPath', ''),
+                'aspectsCount': len(item.get('aspects', []))
+            }
+            
+            # Optionally include aspects if present
+            if 'aspects' in item and item['aspects']:
+                processed_item['aspects'] = [aspect.get('name', '') for aspect in item['aspects']]
+                
+            processed_results.append(processed_item)
+            
+        return processed_results
