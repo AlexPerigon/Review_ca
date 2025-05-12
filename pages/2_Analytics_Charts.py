@@ -7,6 +7,7 @@ import os
 import glob
 import json
 import base64
+from auth import auth_required
 from utils import (
     process_csv,
     analyze_aspects,
@@ -24,14 +25,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# App title and description
-st.title("Analytics & Charts")
-st.markdown("""
-This page provides visual analytics and insights based on your review data.
-""")
+# Create a main function with authentication
+@auth_required
+def main():
+    # App title and description
+    st.title("Analytics & Charts")
+    st.markdown("""
+    This page provides visual analytics and insights based on your review data.
+    """)
 
-# Check if there's data available for analysis
-if 'uploaded_data' not in st.session_state:
+    # Check if there's data available for analysis
+    if 'uploaded_data' not in st.session_state:
     st.warning("No data loaded for analysis. Please upload data from the Data Upload page first.")
     
     # Offer quick options to load data
