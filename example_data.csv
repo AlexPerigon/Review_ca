@@ -1,0 +1,11 @@
+review_id,review_text,category,aspects
+1,"This laptop has a great screen but poor battery life.",Electronics,"screen quality,battery life"
+2,"The camera takes amazing photos even in low light.",Electronics,"photo quality,low light performance"
+3,"The headphones are comfortable but sound quality is average.",Electronics,"comfort,sound quality"
+4,"The restaurant had excellent service but the food was mediocre.",Restaurant,"service,food quality"
+5,"The hotel room was clean but the wifi was slow.",Hotel,"cleanliness,wifi speed"
+6,"The sneakers are durable but not very comfortable.",Footwear,"durability,comfort"
+7,"This phone has incredible battery life and fast charging.",Electronics,"battery life,charging speed"
+8,"The app interface is intuitive but it crashes frequently.",Software,"user interface,stability"
+9,"The restaurant's ambiance was great but service was slow.",Restaurant,"ambiance,service"
+10,"This book has engaging characters but a predictable plot.",Books,"characters,plot"
