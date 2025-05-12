@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import io
 import base64
+import os
+import glob
 
 # Page configuration
 st.set_page_config(
@@ -147,7 +149,7 @@ def analyze_aspects(df):
     return None, None
 
 # File uploader
-st.header("1. Upload Review Data")
+st.header("1. Upload or Select Review Data")
 
 # Example data download option
 st.markdown("Don't have data? Download example data:")
@@ -160,7 +162,59 @@ st.download_button(
     mime="text/csv"
 )
 
-uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+# Check for files in the uploads directory (from API)
+UPLOAD_DIR = 'uploads'
+os.makedirs(UPLOAD_DIR, exist_ok=True)  # Create directory if it doesn't exist
+api_uploaded_files = glob.glob(os.path.join(UPLOAD_DIR, '*.csv'))
+
+# Create a tab layout for different data input methods
+tab1, tab2 = st.tabs(["Upload a File", "API Uploaded Files"])
+
+with tab1:
+    uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+    
+with tab2:
+    if api_uploaded_files:
+        st.success(f"Found {len(api_uploaded_files)} files uploaded via API")
+        selected_api_file = st.selectbox(
+            "Select an API-uploaded file to analyze:",
+            options=api_uploaded_files,
+            format_func=lambda x: os.path.basename(x)
+        )
+        if selected_api_file:
+            st.info(f"Selected file: {os.path.basename(selected_api_file)}")
+            # When API file is selected, we'll load it as the uploaded_file
+            uploaded_file = selected_api_file
+    else:
+        st.info("No files have been uploaded via the API yet. Use the API endpoint to upload files.")
+        
+        # Display API usage information
+        with st.expander("API Usage Information"):
+            st.markdown("""
+            ## API Endpoint
+            
+            You can upload files programmatically via the API endpoint:
+            
+            ```
+            POST /api/upload
+            ```
+            
+            ### Headers
+            - `X-API-Key`: Your API key (set in the environment variables)
+            
+            ### Request
+            - Send the CSV file as a multipart/form-data with key 'file'
+            
+            ### Example (curl)
+            ```bash
+            curl -X POST \\
+                -H "X-API-Key: your_api_key" \\
+                -F "file=@your_reviews.csv" \\
+                https://your-app-url/api/upload
+            ```
+            
+            Uploaded files will appear in this tab for analysis.
+            """)
 
 # Process data if file is uploaded
 if uploaded_file is not None:
@@ -206,14 +260,39 @@ if uploaded_file is not None:
             st.subheader("Aspect Analysis Table")
             st.markdown("Aspects appearing in less than 5% of reviews are highlighted in red.")
             
-            display_columns = ['category', 'aspect', 'count', 'total_reviews', 'percentage']
-            styled_df = filtered_analysis[display_columns].style.apply(
-                lambda row: ['background-color: #FFCCCC' if filtered_analysis.iloc[row.name]['is_low_percentage'] else '' 
-                            for _ in range(len(display_columns))], 
-                axis=1
-            )
+            # Create a copy of the filtered analysis for display
+            display_columns = ['category', 'aspect', 'count', 'total_reviews', 'percentage', 'is_low_percentage']
+            display_df = filtered_analysis[display_columns].copy()
             
-            st.dataframe(styled_df)
+            # Create a styled version for display - simpler approach for Streamlit compatibility
+            display_df_visual = display_df[display_columns[:-1]].copy()  # Don't show the is_low_percentage column
+            
+            # Highlight rows with conditional formatting
+            st.markdown("### Aspect Analysis Table")
+            st.markdown("Aspects appearing in less than 5% of reviews are highlighted in red.")
+            
+            # Display the dataframe with dynamic styling based on is_low_percentage
+            for i, row in display_df.iterrows():
+                if row['is_low_percentage']:
+                    st.markdown(f"""
+                    <div style="background-color: #FFCCCC; padding: 10px; margin: 5px 0; border-radius: 5px;">
+                        <b>Category:</b> {row['category']} | 
+                        <b>Aspect:</b> {row['aspect']} | 
+                        <b>Count:</b> {row['count']} | 
+                        <b>Total Reviews:</b> {row['total_reviews']} | 
+                        <b>Percentage:</b> {row['percentage']}
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="background-color: #f0f2f6; padding: 10px; margin: 5px 0; border-radius: 5px;">
+                        <b>Category:</b> {row['category']} | 
+                        <b>Aspect:</b> {row['aspect']} | 
+                        <b>Count:</b> {row['count']} | 
+                        <b>Total Reviews:</b> {row['total_reviews']} | 
+                        <b>Percentage:</b> {row['percentage']}
+                    </div>
+                    """, unsafe_allow_html=True)
             
             # Display pivot table for all categories
             if selected_category == "All Categories" and len(categories) > 1:
