@@ -3,10 +3,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import altair as alt
-import os
-import json
-import ast
-import base64
 from utils import (
     load_category_data,
     analyze_category_aspects,
@@ -128,14 +124,14 @@ with tabs[0]:
             
             # Group by type and display
             st.dataframe(aspects_df, use_container_width=True)
-            
+
             # Create a pie chart showing the distribution of aspect types
             type_counts = aspects_df['Type'].value_counts().reset_index()
             type_counts.columns = ['Type', 'Count']
-            
+
             fig, ax = plt.subplots(figsize=(8, 8))
-            ax.pie(type_counts['Count'], labels=type_counts['Type'], autopct='%1.1f%%',
-                  startangle=90)
+            ax.pie(type_counts['Count'], labels=type_counts['Type'].tolist(), autopct='%1.1f%%',
+                   startangle=90)
             ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
             st.pyplot(fig)
         else:
@@ -144,144 +140,183 @@ with tabs[0]:
 # Tab 2: Aspect Usage Analysis
 with tabs[1]:
     st.header("Which Aspects are Most/Least Used?")
-    
-    if analysis_results and 'aspect_freq' in analysis_results:
-        aspect_freq = analysis_results['aspect_freq']
-        
-        # Top aspects visualization
+
+    # `analyze_category_aspects()` returns a DataFrame, not a dict
+    if analysis_results is not None and isinstance(analysis_results, pd.DataFrame):
+        aspect_freq: pd.DataFrame = analysis_results.copy()
+
+        # ────────────────────────────────────────────────────────────────────
+        # Most-used aspects
+        # ────────────────────────────────────────────────────────────────────
         st.subheader("Most Used Aspects")
-        
-        # Create bar chart using Altair for the top 20 aspects
+
         top_n = min(20, len(aspect_freq))
         top_aspects = aspect_freq.head(top_n)
-        
-        chart = alt.Chart(top_aspects).mark_bar().encode(
-            y=alt.Y('aspect:N', sort='-x', title='Aspect'),
-            x=alt.X('count:Q', title='Number of Categories Using This Aspect'),
-            tooltip=['aspect', 'count']
-        ).properties(
-            width=700,
-            height=500,
-            title=f'Top {top_n} Most Used Aspects Across Categories'
+
+        alt_data = alt.Data(values=top_aspects.to_dict("records"))
+        top_chart = (
+            alt.Chart(alt_data)
+            .mark_bar()
+            .encode(
+                y=alt.Y("aspect:N", sort="-x", title="Aspect"),
+                x=alt.X("count:Q", title="Number of Categories Using This Aspect"),
+                tooltip=["aspect:N", "count:Q"],
+            )
+            .properties(width=700, height=500, title=f"Top {top_n} Most Used Aspects Across Categories")
         )
-        
-        st.altair_chart(chart, use_container_width=True)
-        
-        # Least used aspects
+        st.altair_chart(top_chart, use_container_width=True)
+
+        # ────────────────────────────────────────────────────────────────────
+        # Least-used aspects
+        # ────────────────────────────────────────────────────────────────────
         st.subheader("Least Used Aspects")
-        
+
         bottom_n = min(20, len(aspect_freq))
-        bottom_aspects = aspect_freq.tail(bottom_n).sort_values('count')
-        
-        chart = alt.Chart(bottom_aspects).mark_bar().encode(
-            y=alt.Y('aspect:N', sort='x', title='Aspect'),
-            x=alt.X('count:Q', title='Number of Categories Using This Aspect'),
-            tooltip=['aspect', 'count']
-        ).properties(
-            width=700,
-            height=500,
-            title=f'Top {bottom_n} Least Used Aspects Across Categories'
+        bottom_aspects = aspect_freq.sort_values(by="count", ascending=True).head(bottom_n)
+
+        alt_data = alt.Data(values=bottom_aspects.to_dict("records"))
+        bottom_chart = (
+            alt.Chart(alt_data)
+            .mark_bar()
+            .encode(
+                y=alt.Y("aspect:N", sort="x", title="Aspect"),
+                x=alt.X("count:Q", title="Number of Categories Using This Aspect"),
+                tooltip=["aspect:N", "count:Q"],
+            )
+            .properties(width=700, height=500, title=f"Top {bottom_n} Least Used Aspects Across Categories")
         )
-        
-        st.altair_chart(chart, use_container_width=True)
-        
-        # Distribution of aspect counts
+        st.altair_chart(bottom_chart, use_container_width=True)
+
+        # ────────────────────────────────────────────────────────────────────
+        # Distribution histogram with enhancements
+        # ────────────────────────────────────────────────────────────────────
         st.subheader("Distribution of Aspect Usage")
-        
-        # Create histogram of aspect counts
+
+        # Extract data
+        counts = aspect_freq["count"].to_numpy()
+
+        # Summary stats
+        mean_val = np.mean(counts)
+        median_val = np.median(counts)
+
         fig, ax = plt.subplots(figsize=(10, 6))
-        ax.hist(aspect_freq['count'], bins=20, alpha=0.7, color='blue')
-        ax.set_xlabel('Number of Categories Using the Aspect')
-        ax.set_ylabel('Number of Aspects')
-        ax.set_title('Distribution of Aspect Usage')
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
-        
-        st.pyplot(fig)
-        
-        # Create matrix visualization (heatmap)
-        st.subheader("Aspect-Category Matrix")
+
+        # Histogram
+        ax.hist(counts, bins=20, alpha=0.7, color='steelblue', edgecolor='black')
+
+        # Labels
+        ax.set_xlabel("Number of Categories Using the Aspect")
+        ax.set_ylabel("Number of Aspects")
+        ax.set_title("How Widely Aspects Are Used Across Categories")
+
+        # Gridlines
+        ax.grid(axis="y", linestyle="--", alpha=0.7)
+
+        # Add mean and median lines
+        ax.axvline(mean_val, color='red', linestyle='dashed', linewidth=1.5, label=f'Mean: {mean_val:.1f}')
+        ax.axvline(median_val, color='green', linestyle='dotted', linewidth=1.5, label=f'Median: {median_val:.1f}')
+
+        # Annotate histogram with explanation
         st.markdown("""
-        This matrix shows which aspects (rows) are used in which categories (columns).
-        Colored cells indicate that the aspect is used in that category.
+        This chart shows **how widely aspects are used across different categories**:
+
+        - **Left side** (low values): Aspects that are niche — used in only a few categories.
+        - **Right side** (high values): Aspects that are universal — used in many or all categories.
+        - The **red dashed line** is the mean usage, and the **green dotted line** is the median.
+
+        Use this chart to understand whether your aspects are generally broad or specific.
         """)
-        
-        # Get the matrix
+
+        # Legend
+        ax.legend()
+
+        # Show chart
+        st.pyplot(fig)
+
+        # ────────────────────────────────────────────────────────────────────
+        # Aspect-Category matrix
+        # ────────────────────────────────────────────────────────────────────
+        st.subheader("Aspect-Category Matrix")
+        st.markdown(
+            """
+            This matrix shows which aspects (rows) are used in which categories (columns).
+            Colored cells indicate that the aspect is used in that category.
+            """
+        )
+
         matrix_df = create_aspect_category_matrix(category_data)
-        
-        if matrix_df is not None:
-            # Only show first 20 aspects and categories for visibility
-            max_aspects = 50
-            max_categories = 20
-            
+
+        if matrix_df is not None and isinstance(matrix_df, pd.DataFrame):
+            max_aspects, max_categories = 500, 500
+
             if len(matrix_df) > max_aspects:
-                st.info(f"Showing only the first {max_aspects} aspects for clarity. Download the full matrix below.")
-                
-            if matrix_df.shape[1] - 1 > max_categories:  # -1 for the 'aspect' column
-                # Select only the first max_categories categories
-                cols_to_show = ['aspect'] + list(matrix_df.columns[1:max_categories+1])
-                matrix_subset = matrix_df[cols_to_show]
-            else:
-                matrix_subset = matrix_df
-                
-            if len(matrix_subset) > max_aspects:
-                matrix_subset = matrix_subset.head(max_aspects)
-            
-            # Convert to long format for Altair heatmap
+                st.info(
+                    f"Showing only the first {max_aspects} aspects for clarity. "
+                    "Download the full matrix below."
+                )
+
+            # Trim to first N categories (after the 'aspect' column)
+            visible_cols = ["aspect"] + list(matrix_df.columns[1 : max_categories + 1])
+            matrix_subset = matrix_df.loc[:, visible_cols].head(max_aspects)
+
+            # Reshape for Altair
             matrix_long = pd.melt(
                 matrix_subset,
-                id_vars=['aspect'],
-                var_name='category',
-                value_name='present'
+                id_vars=["aspect"],
+                var_name="category",
+                value_name="present",
+                ignore_index=False,
             )
-            
-            # Create heatmap
-            heatmap = alt.Chart(matrix_long).mark_rect().encode(
-                x=alt.X('category:N', title='Category'),
-                y=alt.Y('aspect:N', title='Aspect'),
-                color=alt.Color('present:Q', scale=alt.Scale(domain=[0, 1], range=['white', 'blue'])),
-                tooltip=['aspect', 'category', 'present']
-            ).properties(
-                width=1000,
-                height=800,
-                title='Aspect-Category Matrix'
+
+            alt_data = alt.Data(values=matrix_long.to_dict("records"))
+            heatmap = (
+                alt.Chart(alt_data)
+                .mark_rect()
+                .encode(
+                    x=alt.X("category:N", title="Category"),
+                    y=alt.Y("aspect:N", title="Aspect"),
+                    color=alt.Color(
+                        "present:Q",
+                        scale=alt.Scale(domain=[0, 1], range=["white", "blue"]),
+                    ),
+                    tooltip=["aspect:N", "category:N", "present:Q"],
+                )
+                .properties(width=1000, height=800, title="Aspect-Category Matrix")
             )
-            
             st.altair_chart(heatmap, use_container_width=True)
-            
-            # Download the full matrix
+
+            # ────────────────────────────────────────────────────────────
+            # Download links
+            # ────────────────────────────────────────────────────────────
             st.markdown("### Download Full Matrix")
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown(get_csv_download_link(matrix_df, "aspect_category_matrix.csv"), unsafe_allow_html=True)
+                st.markdown(
+                    get_csv_download_link(matrix_df, "aspect_category_matrix.csv"),
+                    unsafe_allow_html=True,
+                )
             with col2:
-                st.markdown(get_json_download_link(matrix_df, "aspect_category_matrix.json"), unsafe_allow_html=True)
+                st.markdown(
+                    get_json_download_link(matrix_df, "aspect_category_matrix.json"),
+                    unsafe_allow_html=True,
+                )
     else:
-        st.error("Analysis results are not available.")
-
+        st.warning("Analysis results are not available. Please run the analysis first.")
 # Tab 3: Categories without Aspects
 with tabs[2]:
     st.header("Categories Without Aspects")
-    
-    if analysis_results and 'categories_no_aspects' in analysis_results:
-        categories_no_aspects = analysis_results['categories_no_aspects']
-        
-        if not categories_no_aspects.empty:
-            st.warning(f"Found {len(categories_no_aspects)} categories without any aspects defined:")
-            
-            # Display the categories without aspects
-            st.dataframe(categories_no_aspects[['id', 'name', 'caCategoryId', 'createdAt', 'updatedAt']], use_container_width=True)
-            
-            # Create a download button for this data
-            st.markdown("### Download List")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(get_csv_download_link(categories_no_aspects, "categories_without_aspects.csv"), unsafe_allow_html=True)
-            with col2:
-                st.markdown(get_json_download_link(categories_no_aspects, "categories_without_aspects.json"), unsafe_allow_html=True)
+
+    if analysis_results is not None:
+        # Filter categories without aspects
+        categories_no_aspects_df = category_data[category_data['aspectsCount'] == 0]
+
+        # Display the actual categories without aspects
+        if not categories_no_aspects_df.empty:
+            st.subheader("Categories Without Aspects (Details)")
+            st.write(f"Found {len(categories_no_aspects_df)} categories without aspects defined:")
+            st.dataframe(categories_no_aspects_df, use_container_width=True)
         else:
-            st.success("All categories have aspects defined!")
-    else:
-        st.error("Analysis results are not available.")
+            st.success("All categories have aspects.")
 
 # Tab 4: Raw Data
 with tabs[3]:

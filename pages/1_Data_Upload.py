@@ -1,12 +1,9 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import os
-import io
 import json
-import base64
 import ast
-from utils import fetch_internal_api_data, get_csv_download_link, get_json_download_link
+from utils import fetch_internal_api_data, fetch_internal_all_api_data
 
 # Page configuration
 st.set_page_config(
@@ -25,99 +22,115 @@ import from our internal API, or send data programmatically via our API.
 # Create tabs for different upload methods
 tabs = st.tabs(["CSV Upload", "Import from API", "API Integration"])
 
-# Tab 1: CSV Upload
 with tabs[0]:
     st.header("Upload CSV File")
-    
+
     # Instructions
     st.markdown("""
     ### CSV Format Requirements
     Your CSV file should include the following columns:
-    - `review_id`: Unique identifier for each review
-    - `review_text`: The full text of the review
-    - `category`: Product/service category the review belongs to
-    - `aspects`: Comma-separated list of aspects mentioned in the review
-    
-    Example row: `101,Great product with excellent battery life,Electronics,battery,price,design`
+    - `id` or `review_id`: Unique identifier
+    - `name` or `review_text`: Review category or full review text
+    - `category` *(optional)*: Product/service category
+    - `aspects`: Either:
+        - Comma-separated list like `battery,price,design`, **or**
+        - Python list string like `['Product/Price', 'Service/Staff']`
     """)
-    
+
     # Use example data option
     if st.checkbox("Use example data instead"):
         st.markdown("Using example data with pre-defined reviews and aspects.")
         from utils import generate_example_csv
         example_data = generate_example_csv()
-        
-        # Create a download link for the example data
+
+        # Download link
         st.download_button(
             label="Download Example CSV",
             data=example_data.getvalue(),
             file_name="example_reviews.csv",
             mime="text/csv"
         )
-        
-        # Process the example data
-        example_data.seek(0)  # Reset position to start of stream
+
+        # Load and process
+        example_data.seek(0)
         df = pd.read_csv(example_data)
-        
+
         st.success("✅ Example data loaded successfully!")
-        
-        # Display data
         st.subheader("Data Preview")
-        st.dataframe(df.head())
-        
-        # Process aspects
+        st.dataframe(df)
+
+        # Parse aspects
         if 'aspects' in df.columns:
-            df['aspects_list'] = df['aspects'].str.split(',')
-        
-        # Option to save to session state for analysis
+            def parse_aspects(val):
+                try:
+                    if val.startswith("[") and val.endswith("]"):
+                        return ast.literal_eval(val)
+                    return [a.strip() for a in val.split(',') if a.strip()]
+                except Exception:
+                    return []
+
+            df['aspects_list'] = df['aspects'].apply(lambda x: parse_aspects(str(x)) if pd.notnull(x) else [])
+
         if st.button("Use Example Data for Analysis"):
-            st.session_state['uploaded_data'] = df
-            st.success("✅ Example data saved for analysis!")
-            
-            # Set redirection in session state
-            if 'redirect_to' not in st.session_state:
-                st.session_state['redirect_to'] = '/Analytics_Charts'
-            
-            # Auto-navigation
-            st.info("You will be automatically redirected to the Analytics page.")
-            st.markdown("<meta http-equiv='refresh' content='2; url=/Analytics_Charts'>", unsafe_allow_html=True)
-            st.markdown("[Click here if not redirected](/Analytics_Charts)")
-    
+            if not df.empty:
+                os.makedirs("example_data", exist_ok=True)
+                data_file = "example_data/review_categories.csv"
+                df.to_csv(data_file, index=False)
+
+                num_rows = df.shape[0]
+
+                st.success(f"✅ Full categories data ({num_rows} records) saved to file.")
+
+                st.subheader("Category Data Preview")
+                st.dataframe(df.head(100))  # Just show first 100 for performance
+
+                # Save only file path, not entire dataframe
+                st.session_state['category_data_path'] = data_file
+
+                if 'redirect_to' not in st.session_state:
+                    st.session_state['redirect_to'] = '/Category_Analysis'
+
+                st.info("You will be automatically redirected to the Category Analysis page.")
+                st.markdown("<meta http-equiv='refresh' content='2; url=/Category_Analysis'>", unsafe_allow_html=True)
+                st.markdown("[Click here if not redirected](/Category_Analysis)")
+
     else:
-        # File uploader
         uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
-        
+
         if uploaded_file is not None:
-            # Process the uploaded file
-            from utils import process_csv
-            df = process_csv(uploaded_file)
-            
-            if df is None:
-                st.error("Failed to process the uploaded file. Please ensure it follows the required format.")
-            else:
-                st.success("✅ File uploaded and processed successfully!")
-                
-                # Display data preview
-                st.subheader("Data Preview")
-                st.dataframe(df.head())
-                
-                # Display raw data sample with expander
-                with st.expander("View Raw Data Sample"):
-                    st.dataframe(df.head(10))
-                
-                # Option to save to session state for analysis
-                if st.button("Use This Data for Analysis"):
-                    st.session_state['uploaded_data'] = df
-                    st.success("✅ Data saved for analysis!")
-                    
-                    # Set redirection in session state
-                    if 'redirect_to' not in st.session_state:
-                        st.session_state['redirect_to'] = '/Analytics_Charts'
-                    
-                    # Auto-navigation button
-                    st.info("You will be automatically redirected to the Analytics page.")
-                    st.markdown("<meta http-equiv='refresh' content='2; url=/Analytics_Charts'>", unsafe_allow_html=True)
-                    st.markdown("[Click here if not redirected](/Analytics_Charts)")
+            from utils import process_csv  # Optional: you can inline the logic if you prefer
+            df = pd.read_csv(uploaded_file)
+
+            # Parse aspects
+            if 'aspects' in df.columns:
+                def parse_aspects(val):
+                    try:
+                        if val.startswith("[") and val.endswith("]"):
+                            return ast.literal_eval(val)
+                        return [a.strip() for a in val.split(',') if a.strip()]
+                    except Exception:
+                        return []
+
+                df['aspects_list'] = df['aspects'].apply(lambda x: parse_aspects(str(x)) if pd.notnull(x) else [])
+
+            st.success("✅ File uploaded and processed successfully!")
+
+            st.subheader("Data Preview")
+            st.dataframe(df.head())
+
+            with st.expander("View Raw Data Sample"):
+                st.dataframe(df.head(10))
+
+            if st.button("Use This Data for Analysis"):
+                st.session_state['uploaded_data'] = df
+                st.success("✅ Data saved for analysis!")
+
+                if 'redirect_to' not in st.session_state:
+                    st.session_state['redirect_to'] = '/Analytics_Charts'
+
+                st.info("You will be automatically redirected to the Analytics page.")
+                st.markdown("<meta http-equiv='refresh' content='2; url=/Analytics_Charts'>", unsafe_allow_html=True)
+                st.markdown("[Click here if not redirected](/Analytics_Charts)")
 
 # Tab 2: Import from API
 with tabs[1]:
@@ -127,14 +140,14 @@ with tabs[1]:
     api_selection = st.selectbox(
         "Select API Source",
         [
-            "Review Categories API (Perigon)", 
+            "Review Categories API paginated (Perigon)", 
+            "Review Categories API all (Perigon)",
             "Custom Categories API (Upload)",
-            "Review Data API (Coming Soon)"
         ]
     )
     
     # Show different content based on API selection
-    if api_selection == "Review Categories API (Perigon)":
+    if api_selection == "Review Categories API paginated (Perigon)":
         # Expand section about the API
         with st.expander("About the Perigon Categories API"):
             st.markdown("""
@@ -198,19 +211,15 @@ with tabs[1]:
                 options=["asc", "desc"],
                 index=0
             )
-        with col3:
-            use_all_endpoint = st.checkbox("Use /all endpoint (no pagination)", value=True, 
-                                          help="Fetches all categories at once without pagination")
         
         # Button to fetch data
-        fetch_button_label = "Fetch All Categories" if use_all_endpoint else "Fetch Categories (paginated)"
+        fetch_button_label = "Fetch Categories (paginated)"
         if st.button(fetch_button_label):
             with st.spinner("Fetching data from Perigon API..."):
                 # Fetch categories from the API
                 categories = fetch_internal_api_data(
                     sort_by=sort_by,
-                    sort_order=sort_order,
-                    use_all_endpoint=use_all_endpoint
+                    sort_order=sort_order
                 )
                 
                 if isinstance(categories, dict) and "error" in categories:
@@ -226,29 +235,98 @@ with tabs[1]:
                     
                     # Save the data to file for later use (cached)
                     if not categories_df.empty:
-                        # Create directory if it doesn't exist
                         os.makedirs("example_data", exist_ok=True)
-                        
-                        # Save to file
-                        categories_df.to_csv("example_data/review_categories.csv", index=False)
-                        st.success("✅ Saved categories data to file for analytics")
-                        
-                        # Show a preview of the data
+                        data_file = "example_data/review_categories.csv"
+                        categories_df.to_csv(data_file, index=False)
+
+                        num_rows = categories_df.shape[0]
+
+                        st.success(f"✅ Full categories data ({num_rows} records) saved to file.")
+
                         st.subheader("Category Data Preview")
-                        st.dataframe(categories_df)
-                        
-                        # Store in session state for immediate use
-                        st.session_state['category_data'] = categories_df
-                        
-                        # Set redirection in session state
+                        st.dataframe(categories_df.head(100))  # Just show first 100 for performance
+
+                        # Save only file path, not entire dataframe
+                        st.session_state['category_data_path'] = data_file
+
                         if 'redirect_to' not in st.session_state:
                             st.session_state['redirect_to'] = '/Category_Analysis'
-                        
-                        # Auto-navigation
+
                         st.info("You will be automatically redirected to the Category Analysis page.")
                         st.markdown("<meta http-equiv='refresh' content='2; url=/Category_Analysis'>", unsafe_allow_html=True)
                         st.markdown("[Click here if not redirected](/Category_Analysis)")
-    
+
+    elif api_selection == "Review Categories API all (Perigon)":
+        # Expand section about the API
+        with st.expander("About the Perigon All Categories API"):
+            st.markdown("""
+            ### Perigon Review Categories API (All)
+        
+            This app connects to the "all categories" endpoint (no pagination):
+        
+            **Endpoint**:
+            ```
+            https://api.perigon.io/v1/internal/ca/reviewCategory/all
+            ```
+        
+            **Authentication**:
+            - Uses the SHARED_SECRET as a query parameter
+        
+            **Response Structure**:
+            ```json
+            [
+                {
+                "id": 1,
+                "name": "Category Name",
+                "createdAt": "2023-01-01T12:00:00Z",
+                "updatedAt": "2023-01-02T12:00:00Z",
+                "caCategoryId": "cat123",
+                "rulesPath": "/path/to/rules",
+                "aspects": [
+                    {"name": "Aspect 1"},
+                    {"name": "Aspect 2"}
+                ]
+                },
+                // more categories...
+            ]
+            ```
+            """)
+        
+        fetch_button_label = "Fetch All Categories"
+        if st.button(fetch_button_label):
+            with st.spinner("Fetching all categories from Perigon API..."):
+                categories = fetch_internal_all_api_data()
+
+                if isinstance(categories, dict) and "error" in categories:
+                    st.error(f"Error fetching categories: {categories['error']}")
+                    if "details" in categories:
+                        st.error(f"Details: {categories['details']}")
+                else:
+                    st.success(f"Successfully fetched {len(categories)} categories from the API")
+                    categories_df = pd.DataFrame(categories)
+
+                    if not categories_df.empty:
+                        os.makedirs("example_data", exist_ok=True)
+                        data_file = "example_data/review_categories.csv"
+                        categories_df.to_csv(data_file, index=False)
+
+                        num_rows = categories_df.shape[0]
+
+                        st.success(f"✅ Full categories data ({num_rows} records) saved to file.")
+
+                        st.subheader("Category Data Preview")
+                        st.dataframe(categories_df.head(100))  # Just show first 100 for performance
+
+                        # Save only file path, not entire dataframe
+                        st.session_state['category_data_path'] = data_file
+
+                        if 'redirect_to' not in st.session_state:
+                            st.session_state['redirect_to'] = '/Category_Analysis'
+
+                        st.info("You will be automatically redirected to the Category Analysis page.")
+                        st.markdown("<meta http-equiv='refresh' content='2; url=/Category_Analysis'>", unsafe_allow_html=True)
+                        st.markdown("[Click here if not redirected](/Category_Analysis)")
+                    
     elif api_selection == "Custom Categories API (Upload)":
         st.subheader("Upload Categories CSV/JSON File")
         st.markdown("""

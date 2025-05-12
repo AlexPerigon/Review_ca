@@ -189,22 +189,8 @@ class InternalAPIClient:
             
         return processed_results
         
-    def get_all_review_categories(self, sort_by="id", sort_order="asc"):
+    def get_all_review_categories(self):
         """
-        Fetch all review categories at once without pagination.
-        
-        This function calls the special /reviewCategory/all endpoint that returns
-        all categories in a single request.
-        
-        Parameters:
-        -----------
-        sort_by : str
-            Field to sort by (default: "id")
-        sort_order : str
-            Sort order, "asc" or "desc" (default: "asc")
-            
-        Returns:
-        --------
         list
             All categories with expected fields:
             - id (int)
@@ -233,9 +219,7 @@ class InternalAPIClient:
         
         # Parameters (only authentication and sorting)
         params = {
-            "sharedSecret": self.shared_secret,
-            "sortBy": sort_by,
-            "sortOrder": sort_order
+            "sharedSecret": self.shared_secret
         }
         
         try:
@@ -244,8 +228,8 @@ class InternalAPIClient:
             
             # Check if request was successful
             if response.status_code == 200:
-                # Process the response data
-                data = response.json()
+                json_data = response.json()
+                data = json_data.get("data", [])
                 
                 # Convert to the same format as the paginated results
                 processed_results = []
