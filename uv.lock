@@ -551,6 +551,7 @@ dependencies = [
     { name = "flask" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "requests" },
     { name = "streamlit" },
 ]
 
@@ -559,6 +560,7 @@ requires-dist = [
     { name = "flask", specifier = ">=3.1.0" },
     { name = "numpy", specifier = ">=2.2.5" },
     { name = "pandas", specifier = ">=2.2.3" },
+    { name = "requests", specifier = ">=2.32.3" },
     { name = "streamlit", specifier = ">=1.45.0" },
 ]
 

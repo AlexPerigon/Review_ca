@@ -5,6 +5,8 @@ import io
 import base64
 import os
 import glob
+import json
+from internal_api import InternalAPIClient
 
 # Page configuration
 st.set_page_config(
@@ -33,6 +35,75 @@ with st.sidebar:
     3. Use filters to explore specific categories
     4. Export the results as needed
     """)
+    
+    st.markdown("---")
+    
+    # Add button to import data from the internal API
+    st.subheader("Import from Internal API")
+    if st.button("Fetch Categories from Internal API"):
+        with st.spinner("Fetching data from internal API..."):
+            # Initialize the API client
+            api_client = InternalAPIClient()
+            # Fetch categories from the API
+            categories = api_client.get_review_categories_paginated()
+            
+            if isinstance(categories, dict) and "error" in categories:
+                st.error(f"Error fetching categories: {categories['error']}")
+                if "details" in categories:
+                    st.error(f"Details: {categories['details']}")
+            else:
+                # Successfully fetched categories
+                st.success(f"Successfully fetched {len(categories)} categories from the API")
+                
+                # Convert to DataFrame for easier handling
+                categories_df = pd.DataFrame(categories)
+                
+                # Display the categories in a dataframe
+                if not categories_df.empty:
+                    # Show a preview of the data
+                    st.subheader("Category Data Preview")
+                    st.dataframe(categories_df)
+                    
+                    # Option to save as CSV
+                    csv_data = categories_df.to_csv(index=False)
+                    csv_b64 = base64.b64encode(csv_data.encode()).decode()
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown(
+                            f'<a href="data:file/csv;base64,{csv_b64}" download="review_categories.csv">Download Categories as CSV</a>', 
+                            unsafe_allow_html=True
+                        )
+                    
+                    with col2:
+                        # Option to create a review analysis template
+                        if st.button("Create Analysis Template from Categories"):
+                            # Create a template CSV with review_id, review_text, category, and aspects columns
+                            # using the fetched category names
+                            if 'name' in categories_df.columns:
+                                categories_list = categories_df['name'].tolist()
+                                
+                                # Create template data
+                                template_data = []
+                                for i, category in enumerate(categories_list[:5]):  # Limit to 5 examples
+                                    template_data.append({
+                                        'review_id': i+1,
+                                        'review_text': f"Example review for {category}",
+                                        'category': category,
+                                        'aspects': "aspect1,aspect2"
+                                    })
+                                
+                                template_df = pd.DataFrame(template_data)
+                                
+                                # Save template as CSV
+                                template_csv = template_df.to_csv(index=False)
+                                template_b64 = base64.b64encode(template_csv.encode()).decode()
+                                
+                                st.success("Created analysis template based on your categories!")
+                                st.markdown(
+                                    f'<a href="data:file/csv;base64,{template_b64}" download="review_analysis_template.csv">Download Analysis Template</a>', 
+                                    unsafe_allow_html=True
+                                )
     
     st.markdown("---")
     st.markdown("**About the Tool**")
