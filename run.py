@@ -37,12 +37,13 @@ def run_api():
         text=True
     )
     
-    # Print output from API server
-    while True:
-        line = api_process.stdout.readline()
-        if not line:
-            break
-        print(f"[API] {line.strip()}")
+    # Print output from API server if stdout is available
+    if api_process.stdout:
+        while True:
+            line = api_process.stdout.readline()
+            if not line:
+                break
+            print(f"[API] {line.strip()}")
     
     api_process.wait()
 
