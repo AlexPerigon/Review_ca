@@ -36,48 +36,45 @@ def main():
 
     # Check if there's data available for analysis
     if 'uploaded_data' not in st.session_state:
-        st.warning("No data loaded for analysis. Please upload data from the Data Upload page first.")
+    st.warning("No data loaded for analysis. Please upload data from the Data Upload page first.")
+    
+    # Offer quick options to load data
+    st.subheader("Quick Data Options")
+    
+    # Check for API uploads
+    api_uploaded_files = get_api_uploaded_files()
+    
+    if api_uploaded_files:
+        st.info(f"Found {len(api_uploaded_files)} files uploaded via API that you can use for analysis.")
         
-        # Offer quick options to load data
-        st.subheader("Quick Data Options")
+        selected_api_file = st.selectbox(
+            "Select an API-uploaded file:",
+            options=api_uploaded_files,
+            format_func=lambda x: os.path.basename(x)
+        )
         
-        # Check for API uploads
-        api_uploaded_files = get_api_uploaded_files()
-        
-        if api_uploaded_files:
-            st.info(f"Found {len(api_uploaded_files)} files uploaded via API that you can use for analysis.")
-            
-            selected_api_file = st.selectbox(
-                "Select an API-uploaded file:",
-                options=api_uploaded_files,
-                format_func=lambda x: os.path.basename(x)
-            )
-        
-            if st.button("Load Selected File"):
-                with st.spinner("Loading data..."):
-                    df = process_csv(selected_api_file)
-                    if df is not None:
-                        st.session_state['uploaded_data'] = df
-                        st.success(f"Successfully loaded {len(df)} reviews!")
-                        st.rerun()
-        
-        # Option to upload file directly here
-        st.markdown("Or upload a file directly:")
-        uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
-        
-        if uploaded_file is not None:
-            with st.spinner("Processing uploaded file..."):
-                df = process_csv(uploaded_file)
+        if selected_api_file and st.button("Load Selected File"):
+            with st.spinner("Loading data..."):
+                df = process_csv(selected_api_file)
                 if df is not None:
                     st.session_state['uploaded_data'] = df
                     st.success(f"Successfully loaded {len(df)} reviews!")
                     st.rerun()
     
-        st.markdown("[Go to Data Upload Page](/Data_Upload)")
-        st.stop()
-
-# Call the main function
-main()
+    # Option to upload file directly here
+    st.markdown("Or upload a file directly:")
+    uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
+    
+    if uploaded_file is not None:
+        with st.spinner("Processing uploaded file..."):
+            df = process_csv(uploaded_file)
+            if df is not None:
+                st.session_state['uploaded_data'] = df
+                st.success(f"Successfully loaded {len(df)} reviews!")
+                st.rerun()
+    
+    st.markdown("[Go to Data Upload Page](/Data_Upload)")
+    st.stop()
 
 # At this point, we have data in the session state
 df = st.session_state['uploaded_data']
