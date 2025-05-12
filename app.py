@@ -64,69 +64,69 @@ Upload or import review data to see aspects organized by category and gain insig
         - Export as CSV
         """)
 
-# Sidebar information
-with st.sidebar:
-    st.header("Instructions")
-    st.markdown("""
-    This tool helps identify which aspects are well-represented or underrepresented in your review categories.
-    
-    ### Required CSV Format:
-    - review_id: Unique identifier for each review
-    - review_text: The text content of the review
-    - category: The category assigned to the review
-    - aspects: Comma-separated list of aspects found in the review
-    """)
-    
-    # Example data download option
-    st.markdown("#### Example Data")
-    st.markdown("Download example data to see the expected format:")
-    example_data = generate_example_csv()
-    example_data.seek(0)
-    st.download_button(
-        label="Download Example CSV",
-        data=example_data.getvalue(),
-        file_name="example_reviews.csv",
-        mime="text/csv"
-    )
+    # Sidebar information
+    with st.sidebar:
+        st.header("Instructions")
+        st.markdown("""
+        This tool helps identify which aspects are well-represented or underrepresented in your review categories.
+        
+        ### Required CSV Format:
+        - review_id: Unique identifier for each review
+        - review_text: The text content of the review
+        - category: The category assigned to the review
+        - aspects: Comma-separated list of aspects found in the review
+        """)
+        
+        # Example data download option
+        st.markdown("#### Example Data")
+        st.markdown("Download example data to see the expected format:")
+        example_data = generate_example_csv()
+        example_data.seek(0)
+        st.download_button(
+            label="Download Example CSV",
+            data=example_data.getvalue(),
+            file_name="example_reviews.csv",
+            mime="text/csv"
+        )
 
-# Information about pages
-st.subheader("Pages")
-col1, col2, col3 = st.columns(3)
+    # Information about pages
+    st.subheader("Pages")
+    col1, col2, col3 = st.columns(3)
 
-with col1:
-    st.markdown("### 📤 Data Upload")
-    st.markdown("""
-    The Data Upload page provides multiple ways to import your review data:
-    - Upload CSV files directly from your computer
-    - Import data from your internal API
-    - Send data via API requests
-    
-    [Go to Data Upload](/Data_Upload)
-    """)
+    with col1:
+        st.markdown("### 📤 Data Upload")
+        st.markdown("""
+        The Data Upload page provides multiple ways to import your review data:
+        - Upload CSV files directly from your computer
+        - Import data from your internal API
+        - Send data via API requests
+        
+        [Go to Data Upload](/Data_Upload)
+        """)
 
-with col2:
-    st.markdown("### 📊 Analytics & Charts")
-    st.markdown("""
-    The Analytics & Charts page helps you visualize your review data:
-    - See aspects distribution by category
-    - Identify underrepresented aspects
-    - View percentage breakdowns
-    - Export results for further analysis
-    
-    [Go to Analytics & Charts](/Analytics_Charts)
-    """)
+    with col2:
+        st.markdown("### 📊 Analytics & Charts")
+        st.markdown("""
+        The Analytics & Charts page helps you visualize your review data:
+        - See aspects distribution by category
+        - Identify underrepresented aspects
+        - View percentage breakdowns
+        - Export results for further analysis
+        
+        [Go to Analytics & Charts](/Analytics_Charts)
+        """)
 
-with col3:
-    st.markdown("### 🔍 Category Analysis")
-    st.markdown("""
-    The Category Analysis page focuses on the categories and aspects from your internal API:
-    - What aspects are in each category?
-    - Which aspects are most/least used?
-    - Which categories have no aspects?
-    - Visualize aspect distribution across categories
-    
-    [Go to Category Analysis](/Category_Analysis)
-    """)
+    with col3:
+        st.markdown("### 🔍 Category Analysis")
+        st.markdown("""
+        The Category Analysis page focuses on the categories and aspects from your internal API:
+        - What aspects are in each category?
+        - Which aspects are most/least used?
+        - Which categories have no aspects?
+        - Visualize aspect distribution across categories
+        
+        [Go to Category Analysis](/Category_Analysis)
+        """)
 
     # Footer
     st.markdown("---")

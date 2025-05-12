@@ -12,8 +12,10 @@ from utils import (
     analyze_category_aspects,
     create_aspect_category_matrix,
     get_csv_download_link,
-    get_json_download_link
+    get_json_download_link,
+    fetch_all_internal_api_data
 )
+from auth import auth_required, check_authentication
 
 # Page configuration
 st.set_page_config(
