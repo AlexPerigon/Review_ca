@@ -6,8 +6,7 @@ import io
 import json
 import base64
 import ast
-from utils import fetch_internal_api_data, fetch_all_internal_api_data, get_csv_download_link, get_json_download_link
-from auth import auth_required, check_authentication
+from utils import fetch_internal_api_data, get_csv_download_link, get_json_download_link
 
 # Page configuration
 st.set_page_config(
@@ -16,12 +15,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Create a main function with authentication
-@auth_required
-def main():
-    # App title and description
-    st.title("Data Upload")
-    st.markdown("""
+# App title and description
+st.title("Data Upload")
+st.markdown("""
 Upload your review data to start the analysis. You can upload a CSV file directly,
 import from our internal API, or send data programmatically via our API.
 """)
@@ -197,19 +193,13 @@ with tabs[1]:
             )
         
         # Button to fetch data
-        fetch_options = ["Fetch with pagination", "Fetch all categories"]
-        fetch_method = st.radio("Fetch method", fetch_options, index=1)
-        
         if st.button("Fetch Categories from Perigon API"):
             with st.spinner("Fetching data from Perigon API..."):
-                # Fetch categories from the API based on selected method
-                if fetch_method == "Fetch with pagination":
-                    categories = fetch_internal_api_data(
-                        sort_by=sort_by,
-                        sort_order=sort_order
-                    )
-                else:  # Fetch all categories
-                    categories = fetch_all_internal_api_data()
+                # Fetch categories from the API
+                categories = fetch_internal_api_data(
+                    sort_by=sort_by,
+                    sort_order=sort_order
+                )
                 
                 if isinstance(categories, dict) and "error" in categories:
                     st.error(f"Error fetching categories: {categories['error']}")
@@ -444,9 +434,6 @@ async function example() {
 }
         """, language="javascript")
 
-    # Footer
-    st.markdown("---")
-    st.caption("Review Aspect Analyzer Tool - Data Upload")
-
-# Call the main function
-main()
+# Footer
+st.markdown("---")
+st.caption("Review Aspect Analyzer Tool - Data Upload")

@@ -187,19 +187,13 @@ def get_api_uploaded_files():
     os.makedirs(UPLOAD_DIR, exist_ok=True)  # Create directory if it doesn't exist
     return [os.path.join(UPLOAD_DIR, f) for f in os.listdir(UPLOAD_DIR) if f.endswith('.csv')]
 
-# Function to fetch data from internal API with pagination
+# Function to fetch data from internal API
 def fetch_internal_api_data(sort_by="id", sort_order="asc"):
     api_client = InternalAPIClient()
     return api_client.get_review_categories_paginated(
         sort_by=sort_by,
         sort_order=sort_order
     )
-
-# Function to fetch all data from internal API without pagination
-def fetch_all_internal_api_data():
-    """Fetch all data from the internal API without pagination"""
-    api_client = InternalAPIClient()
-    return api_client.get_all_review_categories()
 
 # Get top aspects overall
 def get_top_aspects(analysis_df, top_n=10):
