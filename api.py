@@ -89,13 +89,7 @@ def upload_data():
     except Exception as e:
         return jsonify({"error": f"Error processing file: {str(e)}"}), 500
 
-# Helper function to verify API key
-def verify_api_key():
-    """Check if the provided API key is valid"""
-    provided_key = request.headers.get('X-API-Key')
-    if not provided_key or provided_key != API_KEY:
-        return False
-    return True
+# Note: verify_api_key function is already defined above
     
 # Helper function to json serialize objects
 def json_serializer(obj):

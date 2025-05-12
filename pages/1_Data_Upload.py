@@ -140,21 +140,28 @@ with tabs[1]:
             st.markdown("""
             ### Perigon Review Categories API
             
-            This app can connect to your internal API endpoint at:
+            This app can connect to the following internal API endpoints:
+            
+            **Paginated Endpoint**:
             ```
             https://api.perigon.io/v1/internal/ca/reviewCategory/
             ```
             
-            **Authentication**:
-            - Uses the SHARED_SECRET as a query parameter
+            **All Categories Endpoint (Non-paginated)**:
+            ```
+            https://api.perigon.io/v1/internal/ca/reviewCategory/all
+            ```
             
-            **Pagination Parameters**:
+            **Authentication**:
+            - Both endpoints use the SHARED_SECRET as a query parameter
+            
+            **Pagination Parameters** (for paginated endpoint only):
             - page (default: 0) - The page number to retrieve
             - size (default: 20) - Number of items per page
             - sortBy (default: "id") - Field to sort by
             - sortOrder (default: "asc") - Sort order
             
-            **Response Structure**:
+            **Response Structure** (paginated endpoint):
             ```json
             {
               "total": 123,  // Total number of records
@@ -175,30 +182,59 @@ with tabs[1]:
               ]
             }
             ```
+            
+            **Response Structure** (all endpoint):
+            ```json
+            [
+              {
+                "id": 1,
+                "name": "Category Name",
+                "createdAt": "2023-01-01T12:00:00Z",
+                "updatedAt": "2023-01-02T12:00:00Z",
+                "caCategoryId": "cat123",
+                "rulesPath": "/path/to/rules",
+                "aspects": [
+                  {"name": "Aspect 1"},
+                  {"name": "Aspect 2"}
+                ]
+              },
+              // more categories...
+            ]
+            ```
             """)
         
         # API fetch options
-        col1, col2 = st.columns(2)
-        with col1:
-            sort_by = st.selectbox(
-                "Sort by field", 
-                options=["id", "name", "createdAt", "updatedAt"],
-                index=0
-            )
-        with col2:
-            sort_order = st.selectbox(
-                "Sort order", 
-                options=["asc", "desc"],
-                index=0
-            )
+        use_all_endpoint = st.checkbox("Use non-paginated endpoint (/all)", value=True, 
+                                    help="If checked, fetches all categories at once instead of paginating. This is more efficient but may take longer for large datasets.")
+        
+        # Only show sorting options if not using all endpoint
+        if not use_all_endpoint:
+            col1, col2 = st.columns(2)
+            with col1:
+                sort_by = st.selectbox(
+                    "Sort by field", 
+                    options=["id", "name", "createdAt", "updatedAt"],
+                    index=0
+                )
+            with col2:
+                sort_order = st.selectbox(
+                    "Sort order", 
+                    options=["asc", "desc"],
+                    index=0
+                )
+        else:
+            # Default values when using all endpoint
+            sort_by = "id"
+            sort_order = "asc"
         
         # Button to fetch data
         if st.button("Fetch Categories from Perigon API"):
-            with st.spinner("Fetching data from Perigon API..."):
-                # Fetch categories from the API
+            with st.spinner(f"Fetching data from Perigon API ({'non-paginated /all' if use_all_endpoint else 'paginated'} endpoint)..."):
+                # Fetch categories from the API using the selected endpoint
                 categories = fetch_internal_api_data(
                     sort_by=sort_by,
-                    sort_order=sort_order
+                    sort_order=sort_order,
+                    use_all_endpoint=use_all_endpoint
                 )
                 
                 if isinstance(categories, dict) and "error" in categories:
