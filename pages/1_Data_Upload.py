@@ -42,7 +42,7 @@ with tabs[0]:
     """)
     
     # Use example data option
-    if st.checkbox("Use example data for testing"):
+    if st.checkbox("Use example data instead"):
         st.markdown("Using example data with pre-defined reviews and aspects.")
         from utils import generate_example_csv
         example_data = generate_example_csv()
@@ -541,8 +541,6 @@ with tabs[2]:
                 except Exception as e:
                     st.error(f"Error executing API call: {str(e)}")
     
-    # API authentication information
-    st.markdown("""
     #### Authentication
     All API requests require the `X-API-Key` header. Contact the administrator to get your API key.
     """)
@@ -560,14 +558,14 @@ api_key = "YOUR_API_KEY"
 base_url = "http://localhost:5001"
 
 # Upload a CSV file
-def upload_csv(csv_path):
+def upload_csv(file_path):
     headers = {
         "X-API-Key": api_key
     }
     
-    with open(csv_path, 'rb') as f:
+    with open(file_path, 'rb') as f:
         files = {
-            'file': (csv_path, f, 'text/csv')
+            'file': (file_path, f, 'text/csv')
         }
         
         response = requests.post(
@@ -598,7 +596,7 @@ print(result)
 
 analytics = get_analytics()
 print(analytics)
-""", language="python")
+        """, language="python")
     
     with st.expander("JavaScript Example Code"):
         st.code("""
@@ -645,7 +643,7 @@ async function example() {
     const analytics = await getAnalytics();
     console.log(analytics);
 }
-""", language="javascript")
+        """, language="javascript")
 
 # Footer
 st.markdown("---")
